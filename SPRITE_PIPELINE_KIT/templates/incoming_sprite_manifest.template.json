@@ -1,0 +1,44 @@
+[
+  {
+    "entity_id": "entity_a",
+    "source_file": "entity_a_sheet.png",
+    "variant_axes": {
+      "state": "base",
+      "faction": "neutral",
+      "palette": "default"
+    },
+    "component_order": [
+      "variant_a",
+      "variant_b"
+    ],
+    "notes": "Replace this placeholder entry with the real board metadata and variant axes used by the project."
+  },
+  {
+    "entity_id": "entity_b",
+    "source_file": "entity_b_sheet.png",
+    "variant_axes": {
+      "state": "base",
+      "faction": "neutral",
+      "palette": "default"
+    },
+    "component_order": [
+      "variant_a",
+      "variant_b"
+    ],
+    "notes": "Add all real entities/variants used by the project."
+  },
+  {
+    "entity_id": "entity_c",
+    "source_file": "entity_c_sheet.png",
+    "variant_axes": {
+      "state": "base",
+      "faction": "neutral",
+      "palette": "default"
+    },
+    "component_order": [
+      "variant_a",
+      "variant_b"
+    ],
+    "notes": "This starter file is intentionally minimal and should be customized."
+  }
+]

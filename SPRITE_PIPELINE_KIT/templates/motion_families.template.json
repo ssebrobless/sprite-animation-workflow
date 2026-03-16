@@ -1,0 +1,11 @@
+{
+  "notes": [
+    "Customize these motion families for your project.",
+    "Split dense families into smaller packs when Gemini output gets blurry.",
+    "The examples below are defaults, not requirements."
+  ],
+  "preset": "{{PRESET_NAME}}",
+  "families": {{MOTION_FAMILIES_JSON}},
+  "variantAxes": {{VARIANT_AXES_JSON}},
+  "seedEntities": {{ENTITY_IDS_JSON}}
+}
