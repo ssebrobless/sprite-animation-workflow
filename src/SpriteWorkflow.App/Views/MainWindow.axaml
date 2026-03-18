@@ -1,0 +1,939 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SpriteWorkflow.App.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        x:Class="SpriteWorkflow.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        d:DesignWidth="1280"
+        d:DesignHeight="860"
+        Width="1280"
+        Height="860"
+        MinWidth="1080"
+        MinHeight="760"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="{Binding AppTitle}"
+        Background="#F4F1E8">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel />
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,*" ColumnDefinitions="280,*">
+        <Border Grid.Row="0"
+                Grid.ColumnSpan="2"
+                Background="#243746"
+                Padding="24,18">
+            <StackPanel Spacing="4">
+                <TextBlock Text="{Binding AppTitle}"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Foreground="#F6F3EB" />
+                <TextBlock Text="{Binding Subtitle}"
+                           Foreground="#D6DFE6" />
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1"
+                Grid.Column="0"
+                Background="#D9D0BE"
+                Padding="18">
+            <StackPanel Spacing="18">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Workspace"
+                               FontSize="16"
+                               FontWeight="Bold" />
+                    <ItemsControl ItemsSource="{Binding NavigationItems}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#F4F1E8"
+                                        CornerRadius="10"
+                                        Padding="12"
+                                        Margin="0,0,0,8">
+                                    <TextBlock Text="{Binding .}" />
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Recent Projects"
+                               FontSize="16"
+                               FontWeight="Bold" />
+                    <ItemsControl ItemsSource="{Binding RecentProjects}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="#9A8D7A"
+                                        BorderThickness="1"
+                                        CornerRadius="10"
+                                        Padding="10"
+                                        Margin="0,0,0,8">
+                                    <TextBlock Text="{Binding .}" />
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1"
+                      Grid.Column="1"
+                      Margin="22">
+            <StackPanel Spacing="16">
+                <Border Background="#FFFDFC"
+                        BorderBrush="#C9BDAA"
+                        BorderThickness="1"
+                        CornerRadius="16"
+                        Padding="22">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Selected Project"
+                                   FontSize="16"
+                                   FontWeight="Bold" />
+                        <TextBlock Text="{Binding SelectedProjectName}"
+                                   FontSize="22"
+                                   FontWeight="Bold" />
+                        <TextBlock Text="{Binding SelectedProjectSummary}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding SelectedProjectConfigPath}"
+                                   Foreground="#665A4A" />
+                        <TextBlock Text="{Binding StatusMessage}"
+                                   Foreground="#665A4A" />
+                    </StackPanel>
+                </Border>
+
+                <Grid ColumnDefinitions="*,*,*">
+                    <Border Grid.Column="0"
+                            Background="#F0EBE1"
+                            BorderBrush="#C9BDAA"
+                            BorderThickness="1"
+                            CornerRadius="16"
+                            Padding="18"
+                            Margin="0,0,8,0">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Expected Variants"
+                                       FontWeight="Bold" />
+                            <TextBlock Text="{Binding ExpectedVariantCount}"
+                                       FontSize="26"
+                                       FontWeight="Bold" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="1"
+                            Background="#E5ECEB"
+                            BorderBrush="#C9BDAA"
+                            BorderThickness="1"
+                            CornerRadius="16"
+                            Padding="18"
+                            Margin="8,0">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Complete Variants"
+                                       FontWeight="Bold" />
+                            <TextBlock Text="{Binding CompleteVariantCount}"
+                                       FontSize="26"
+                                       FontWeight="Bold" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="2"
+                            Background="#F6E5D8"
+                            BorderBrush="#C9BDAA"
+                            BorderThickness="1"
+                            CornerRadius="16"
+                            Padding="18"
+                            Margin="8,0,0,0">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Incomplete Variants"
+                                       FontWeight="Bold" />
+                            <TextBlock Text="{Binding IncompleteVariantCount}"
+                                       FontSize="26"
+                                       FontWeight="Bold" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Grid ColumnDefinitions="*,*">
+                    <Border Grid.Column="0"
+                            Background="#FFFDFC"
+                            BorderBrush="#C9BDAA"
+                            BorderThickness="1"
+                            CornerRadius="16"
+                            Padding="18"
+                            Margin="0,0,8,0">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Family Coverage"
+                                       FontSize="16"
+                                       FontWeight="Bold" />
+                            <ItemsControl ItemsSource="{Binding FamilyCoverage}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:FamilyCoverageItemViewModel">
+                                        <Grid ColumnDefinitions="*,Auto"
+                                              Margin="0,0,0,10">
+                                            <TextBlock Text="{Binding Family}" />
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Progress}"
+                                                       FontWeight="Bold" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="1"
+                            Background="#FFFDFC"
+                            BorderBrush="#C9BDAA"
+                            BorderThickness="1"
+                            CornerRadius="16"
+                            Padding="18"
+                            Margin="8,0,0,0">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Workflow Actions"
+                                       FontSize="16"
+                                       FontWeight="Bold" />
+                            <ItemsControl ItemsSource="{Binding WorkflowActions}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:WorkflowActionItemViewModel">
+                                        <Border Background="#F4F1E8"
+                                                CornerRadius="10"
+                                                Padding="12"
+                                                Margin="0,0,0,10">
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontWeight="Bold" />
+                                                <TextBlock Text="{Binding Command}" />
+                                                <TextBlock Text="{Binding Arguments}"
+                                                           Foreground="#665A4A"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Border Background="#FFFDFC"
+                        BorderBrush="#C9BDAA"
+                        BorderThickness="1"
+                        CornerRadius="16"
+                        Padding="18">
+                    <StackPanel Spacing="14">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Asset Browser"
+                                           FontSize="16"
+                                           FontWeight="Bold" />
+                                <TextBlock Text="Filter base rows by species, family, and readiness so review stays focused."
+                                           Foreground="#665A4A" />
+                            </StackPanel>
+                            <Border Grid.Column="1"
+                                    Background="#F4F1E8"
+                                    CornerRadius="999"
+                                    Padding="12,6"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{Binding AssetBrowserSummary}"
+                                           FontWeight="Bold" />
+                            </Border>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,*,*,*"
+                              ColumnSpacing="12">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Species"
+                                           FontWeight="Bold" />
+                                <ComboBox ItemsSource="{Binding SpeciesFilterOptions}"
+                                          SelectedItem="{Binding SelectedSpeciesFilter}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1"
+                                        Spacing="6">
+                                <TextBlock Text="Family"
+                                           FontWeight="Bold" />
+                                <ComboBox ItemsSource="{Binding FamilyFilterOptions}"
+                                          SelectedItem="{Binding SelectedFamilyFilter}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2"
+                                        Spacing="6">
+                                <TextBlock Text="Coverage"
+                                           FontWeight="Bold" />
+                                <ComboBox ItemsSource="{Binding CoverageStatusFilterOptions}"
+                                          SelectedItem="{Binding SelectedCoverageStatusFilter}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="3"
+                                        Spacing="6">
+                                <TextBlock Text="Review"
+                                           FontWeight="Bold" />
+                                <ComboBox ItemsSource="{Binding ReviewStatusFilterOptions}"
+                                          SelectedItem="{Binding SelectedReviewStatusFilter}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="1.35*,*"
+                              ColumnSpacing="14">
+                            <Border Grid.Column="0"
+                                    Background="#F7F3EB"
+                                    BorderBrush="#D6C7B0"
+                                    BorderThickness="1"
+                                    CornerRadius="14"
+                                    Padding="12">
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnDefinitions="2*,Auto,3*">
+                                        <TextBlock Text="Variant"
+                                                   FontWeight="Bold" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="Status"
+                                                   FontWeight="Bold"
+                                                   Margin="12,0,0,0" />
+                                        <TextBlock Grid.Column="2"
+                                                   Text="Family Coverage"
+                                                   FontWeight="Bold"
+                                                   Margin="12,0,0,0" />
+                                    </Grid>
+
+                                    <ListBox ItemsSource="{Binding FilteredBaseVariants}"
+                                             SelectedItem="{Binding SelectedBaseVariant}"
+                                             BorderThickness="0"
+                                             Background="Transparent"
+                                             MinHeight="340">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:BaseVariantRowItemViewModel">
+                                                <Border Background="#FFFDFC"
+                                                        BorderBrush="#DED2C0"
+                                                        BorderThickness="1"
+                                                        CornerRadius="12"
+                                                        Padding="12"
+                                                        Margin="0,0,0,8">
+                                                    <StackPanel Spacing="10">
+                                                        <Grid ColumnDefinitions="2*,Auto,3*"
+                                                              ColumnSpacing="12">
+                                                            <StackPanel Spacing="2">
+                                                                <TextBlock Text="{Binding DisplayName}"
+                                                                           FontWeight="Bold" />
+                                                                <TextBlock Text="{Binding ReviewStatusLabel}"
+                                                                           Foreground="#4F5B59" />
+                                                                <TextBlock Text="{Binding ExpectedColors, StringFormat='{}{0} color variants'}"
+                                                                           Foreground="#665A4A" />
+                                                            </StackPanel>
+                                                            <Border Grid.Column="1"
+                                                                    Background="#E8E3D8"
+                                                                    CornerRadius="999"
+                                                                    Padding="10,4"
+                                                                    VerticalAlignment="Top">
+                                                                <TextBlock Text="{Binding StatusLabel}" />
+                                                            </Border>
+                                                            <TextBlock Grid.Column="2"
+                                                                       Text="{Binding FamilySummary}"
+                                                                       TextWrapping="Wrap"
+                                                                       Foreground="#4F463A" />
+                                                        </Grid>
+                                                        <TextBlock Text="{Binding ReviewNotePreview}"
+                                                                   Foreground="#665A4A"
+                                                                   TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="1"
+                                    Background="#F7FBFA"
+                                    BorderBrush="#D6C7B0"
+                                    BorderThickness="1"
+                                    CornerRadius="14"
+                                    Padding="16">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Selected Row"
+                                               FontSize="16"
+                                               FontWeight="Bold" />
+                                    <TextBlock Text="{Binding SelectedBaseVariantTitle}"
+                                               FontSize="20"
+                                               FontWeight="Bold"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding SelectedBaseVariantStatus}"
+                                               Foreground="#4F5B59"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding SelectedBaseVariantSummary}"
+                                               Foreground="#665A4A"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,4" />
+                                    <TextBlock Text="{Binding SelectedBaseVariantReviewSummary}"
+                                               Foreground="#4F5B59"
+                                               TextWrapping="Wrap" />
+
+                                    <ItemsControl ItemsSource="{Binding SelectedBaseVariantFamilyProgress}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:FamilyProgressItemViewModel">
+                                                <Border Background="#FFFDFC"
+                                                        BorderBrush="#D8E3E1"
+                                                        BorderThickness="1"
+                                                        CornerRadius="10"
+                                                        Padding="12"
+                                                        Margin="0,0,0,8">
+                                                    <Grid ColumnDefinitions="*,Auto">
+                                                        <StackPanel Spacing="2">
+                                                            <TextBlock Text="{Binding Family}"
+                                                                       FontWeight="Bold" />
+                                                            <TextBlock Text="Complete colors"
+                                                                       Foreground="#5C6A68" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="{Binding Progress}"
+                                                                   FontWeight="Bold"
+                                                                   VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <Border Background="#FFFDFC"
+                                            BorderBrush="#D8E3E1"
+                                            BorderThickness="1"
+                                            CornerRadius="10"
+                                            Padding="12"
+                                            Margin="0,6,0,0">
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="Review"
+                                                       FontWeight="Bold" />
+                                            <ComboBox ItemsSource="{Binding ReviewStatusOptions}"
+                                                      SelectedItem="{Binding SelectedBaseVariant.ReviewStatus}"
+                                                      MinWidth="180" />
+                                            <TextBox Text="{Binding SelectedBaseVariant.ReviewNote}"
+                                                     AcceptsReturn="True"
+                                                     TextWrapping="Wrap"
+                                                     MinHeight="110" />
+                                            <TextBlock Text="{Binding SelectedBaseVariant.ReviewUpdatedLabel}"
+                                                       Foreground="#5C6A68" />
+                                            <TextBlock Text="{Binding ReviewDataPathDisplay}"
+                                                       Foreground="#665A4A"
+                                                       TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding ReviewSaveMessage}"
+                                                       Foreground="#665A4A"
+                                                       TextWrapping="Wrap" />
+                                            <Grid ColumnDefinitions="*,*,*"
+                                                  ColumnSpacing="8">
+                                                <Button Content="Approve"
+                                                        Command="{Binding MarkSelectedApprovedCommand}" />
+                                                <Button Grid.Column="1"
+                                                        Content="Needs Review"
+                                                        Command="{Binding MarkSelectedNeedsReviewCommand}" />
+                                                <Button Grid.Column="2"
+                                                        Content="To Repair"
+                                                        Command="{Binding MarkSelectedToBeRepairedCommand}" />
+                                            </Grid>
+                                            <StackPanel Orientation="Horizontal"
+                                                        Spacing="8">
+                                                <Button Content="Create Request"
+                                                        Command="{Binding CreateRequestFromSelectedCommand}" />
+                                                <Button Content="Clear Review"
+                                                        Command="{Binding ClearSelectedReviewCommand}" />
+                                                <Button Content="Save Review"
+                                                        Command="{Binding SaveReviewCommand}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="#FFFDFC"
+                        BorderBrush="#C9BDAA"
+                        BorderThickness="1"
+                        CornerRadius="16"
+                        Padding="18">
+                    <StackPanel Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Repair Queue"
+                                           FontSize="16"
+                                           FontWeight="Bold" />
+                                <TextBlock Text="Rows marked for repair stay here until they are fixed or reclassified."
+                                           Foreground="#665A4A"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1"
+                                        Spacing="4"
+                                        HorizontalAlignment="Right">
+                                <Border Background="#F4F1E8"
+                                        CornerRadius="999"
+                                        Padding="12,6">
+                                    <TextBlock Text="{Binding RepairQueueSummary}"
+                                               FontWeight="Bold" />
+                                </Border>
+                                <TextBlock Text="{Binding NeedsReviewSummary}"
+                                           Foreground="#665A4A"
+                                           HorizontalAlignment="Right" />
+                                <Button Content="Create Request From Queue"
+                                        Command="{Binding CreateRequestFromRepairQueueCommand}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <ListBox ItemsSource="{Binding RepairQueueItems}"
+                                 SelectedItem="{Binding SelectedRepairQueueItem}"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 MinHeight="150">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:BaseVariantRowItemViewModel">
+                                    <Border Background="#F7F3EB"
+                                            BorderBrush="#D6C7B0"
+                                            BorderThickness="1"
+                                            CornerRadius="12"
+                                            Padding="12"
+                                            Margin="0,0,0,8">
+                                        <StackPanel Spacing="6">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           FontWeight="Bold" />
+                                                <Border Grid.Column="1"
+                                                        Background="#F6E5D8"
+                                                        CornerRadius="999"
+                                                        Padding="10,4">
+                                                    <TextBlock Text="{Binding ReviewStatusLabel}" />
+                                                </Border>
+                                            </Grid>
+                                            <TextBlock Text="{Binding FamilySummary}"
+                                                       Foreground="#4F463A"
+                                                       TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding ReviewNotePreview}"
+                                                       Foreground="#665A4A"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="#FFFDFC"
+                        BorderBrush="#C9BDAA"
+                        BorderThickness="1"
+                        CornerRadius="16"
+                        Padding="18">
+                    <StackPanel Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Requests"
+                                           FontSize="16"
+                                           FontWeight="Bold" />
+                                <TextBlock Text="Turn repair notes or new asset ideas into saved, AI-ready request records."
+                                           Foreground="#665A4A"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Border Grid.Column="1"
+                                    Background="#F4F1E8"
+                                    CornerRadius="999"
+                                    Padding="12,6">
+                                <TextBlock Text="{Binding RequestSummary}"
+                                           FontWeight="Bold" />
+                            </Border>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="0.95*,1.05*"
+                              ColumnSpacing="14">
+                            <Border Grid.Column="0"
+                                    Background="#F7F3EB"
+                                    BorderBrush="#D6C7B0"
+                                    BorderThickness="1"
+                                    CornerRadius="14"
+                                    Padding="12">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Saved Requests"
+                                               FontSize="16"
+                                               FontWeight="Bold" />
+                                    <ListBox ItemsSource="{Binding Requests}"
+                                             SelectedItem="{Binding SelectedRequestItem}"
+                                             BorderThickness="0"
+                                             Background="Transparent"
+                                             MinHeight="220">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:RequestItemViewModel">
+                                                <Border Background="#FFFDFC"
+                                                        BorderBrush="#DED2C0"
+                                                        BorderThickness="1"
+                                                        CornerRadius="12"
+                                                        Padding="12"
+                                                        Margin="0,0,0,8">
+                                                    <StackPanel Spacing="6">
+                                                        <Grid ColumnDefinitions="*,Auto">
+                                                            <TextBlock Text="{Binding Title}"
+                                                                       FontWeight="Bold"
+                                                                       TextWrapping="Wrap" />
+                                                            <Border Grid.Column="1"
+                                                                    Background="#E8E3D8"
+                                                                    CornerRadius="999"
+                                                                    Padding="10,4">
+                                                                <TextBlock Text="{Binding StatusLabel}" />
+                                                            </Border>
+                                                        </Grid>
+                                                        <TextBlock Text="{Binding TypeLabel}"
+                                                                   Foreground="#4F5B59" />
+                                                        <TextBlock Text="{Binding TargetScope}"
+                                                                   Foreground="#665A4A"
+                                                                   TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding UpdatedLabel}"
+                                                                   Foreground="#665A4A" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="1"
+                                    Background="#F7FBFA"
+                                    BorderBrush="#D8E3E1"
+                                    BorderThickness="1"
+                                    CornerRadius="14"
+                                    Padding="12">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Request Draft"
+                                               FontSize="16"
+                                               FontWeight="Bold" />
+                                    <Grid ColumnDefinitions="*,*"
+                                          ColumnSpacing="10">
+                                        <StackPanel Spacing="6">
+                                            <TextBlock Text="Type"
+                                                       FontWeight="Bold" />
+                                            <ComboBox ItemsSource="{Binding RequestTypeOptions}"
+                                                      SelectedItem="{Binding DraftRequestType}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1"
+                                                    Spacing="6">
+                                            <TextBlock Text="Status"
+                                                       FontWeight="Bold" />
+                                            <ComboBox ItemsSource="{Binding RequestStatusOptions}"
+                                                      SelectedItem="{Binding DraftRequestStatus}" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Title"
+                                                   FontWeight="Bold" />
+                                        <TextBox Text="{Binding DraftRequestTitle}" />
+                                    </StackPanel>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Target Scope"
+                                                   FontWeight="Bold" />
+                                        <TextBox Text="{Binding DraftRequestTargetScope}" />
+                                    </StackPanel>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Details"
+                                                   FontWeight="Bold" />
+                                        <TextBox Text="{Binding DraftRequestDetails}"
+                                                 AcceptsReturn="True"
+                                                 TextWrapping="Wrap"
+                                                 MinHeight="90" />
+                                    </StackPanel>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Must Preserve"
+                                                   FontWeight="Bold" />
+                                        <TextBox Text="{Binding DraftRequestMustPreserve}"
+                                                 AcceptsReturn="True"
+                                                 TextWrapping="Wrap"
+                                                 MinHeight="70" />
+                                    </StackPanel>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Must Avoid"
+                                                   FontWeight="Bold" />
+                                        <TextBox Text="{Binding DraftRequestMustAvoid}"
+                                                 AcceptsReturn="True"
+                                                 TextWrapping="Wrap"
+                                                 MinHeight="70" />
+                                    </StackPanel>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Source Note"
+                                                   FontWeight="Bold" />
+                                        <TextBox Text="{Binding DraftRequestSourceNote}"
+                                                 AcceptsReturn="True"
+                                                 TextWrapping="Wrap"
+                                                 MinHeight="70" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding RequestDataPathDisplay}"
+                                               Foreground="#665A4A"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding RequestExportPathDisplay}"
+                                               Foreground="#665A4A"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding RequestSaveMessage}"
+                                               Foreground="#665A4A"
+                                               TextWrapping="Wrap" />
+                                    <Border Background="#FFFDFC"
+                                            BorderBrush="#D8E3E1"
+                                            BorderThickness="1"
+                                            CornerRadius="10"
+                                            Padding="12">
+                                        <StackPanel Spacing="6">
+                                            <TextBlock Text="AI Handoff Preview"
+                                                       FontWeight="Bold" />
+                                            <TextBlock Text="{Binding DraftRequestPreview}"
+                                                       FontFamily="Consolas"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+                                    <StackPanel Orientation="Horizontal"
+                                                Spacing="8">
+                                        <Button Content="Prefill From Selected Row"
+                                                Command="{Binding CreateRequestFromSelectedCommand}" />
+                                        <Button Content="Clear Draft"
+                                                Command="{Binding ClearRequestDraftCommand}" />
+                                        <Button Content="Export Handoff"
+                                                Command="{Binding ExportDraftRequestCommand}" />
+                                        <Button Content="Save Request"
+                                                Command="{Binding SaveRequestCommand}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="#FFFDFC"
+                        BorderBrush="#C9BDAA"
+                        BorderThickness="1"
+                        CornerRadius="16"
+                        Padding="18">
+                    <StackPanel Spacing="14">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Animation Preview"
+                                           FontSize="16"
+                                           FontWeight="Bold" />
+                                <TextBlock Text="Authored-first preview for the selected row, with live playback and explicit missing-frame warnings."
+                                           Foreground="#665A4A"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        Spacing="8"
+                                        VerticalAlignment="Center">
+                                <Button Content="Prev"
+                                        Command="{Binding StepPreviousFrameCommand}" />
+                                <Button Content="Restart"
+                                        Command="{Binding RestartPreviewCommand}" />
+                                <Button Content="Next"
+                                        Command="{Binding StepNextFrameCommand}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,*,Auto,Auto"
+                              ColumnSpacing="12">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Color"
+                                           FontWeight="Bold" />
+                                <ComboBox ItemsSource="{Binding ViewerColorOptions}"
+                                          SelectedItem="{Binding SelectedViewerColor}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1"
+                                        Spacing="6">
+                                <TextBlock Text="Family"
+                                           FontWeight="Bold" />
+                                <ComboBox ItemsSource="{Binding ViewerFamilyOptions}"
+                                          SelectedItem="{Binding SelectedViewerFamily}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2"
+                                        Spacing="6">
+                                <TextBlock Text="Sequence"
+                                           FontWeight="Bold" />
+                                <ComboBox ItemsSource="{Binding ViewerSequenceOptions}"
+                                          SelectedItem="{Binding SelectedViewerSequenceId}"
+                                          MinWidth="130" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="3"
+                                        Spacing="6"
+                                        VerticalAlignment="Bottom">
+                                <TextBlock Text="Playback"
+                                           FontWeight="Bold" />
+                                <CheckBox Content="Auto-play"
+                                          IsChecked="{Binding IsPlaybackEnabled}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="1.1*,0.9*"
+                              ColumnSpacing="14">
+                            <Border Grid.Column="0"
+                                    Background="#F7FBFA"
+                                    BorderBrush="#D8E3E1"
+                                    BorderThickness="1"
+                                    CornerRadius="14"
+                                    Padding="16">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="{Binding ViewerStatusMessage}"
+                                               FontSize="18"
+                                               FontWeight="Bold"
+                                               TextWrapping="Wrap" />
+
+                                    <Border Background="#FFFDFC"
+                                            BorderBrush="#D8E3E1"
+                                            BorderThickness="1"
+                                            CornerRadius="12"
+                                            Padding="18"
+                                            MinHeight="280">
+                                        <Grid ColumnDefinitions="*,*"
+                                              ColumnSpacing="14">
+                                            <StackPanel Spacing="10"
+                                                        HorizontalAlignment="Center">
+                                                <TextBlock Text="Authored"
+                                                           FontWeight="Bold"
+                                                           HorizontalAlignment="Center" />
+                                                <Image Source="{Binding CurrentFrameBitmap}"
+                                                       Width="224"
+                                                       Height="224"
+                                                       Stretch="Uniform"
+                                                       HorizontalAlignment="Center" />
+                                                <TextBlock Text="{Binding ViewerFrameSummary}"
+                                                           FontWeight="Bold"
+                                                           HorizontalAlignment="Center"
+                                                           TextAlignment="Center"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="1"
+                                                        Spacing="10"
+                                                        HorizontalAlignment="Center">
+                                                <TextBlock Text="Runtime"
+                                                           FontWeight="Bold"
+                                                           HorizontalAlignment="Center" />
+                                                <Image Source="{Binding RuntimeFrameBitmap}"
+                                                       Width="224"
+                                                       Height="224"
+                                                       Stretch="Uniform"
+                                                       HorizontalAlignment="Center" />
+                                                <TextBlock Text="{Binding RuntimeViewerFrameSummary}"
+                                                           FontWeight="Bold"
+                                                           HorizontalAlignment="Center"
+                                                           TextAlignment="Center"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+
+                                    <TextBlock Text="{Binding ViewerMissingSummary}"
+                                               Foreground="#665A4A"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding ViewerFramePath}"
+                                               Foreground="#665A4A"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding RuntimeViewerFramePath}"
+                                               Foreground="#665A4A"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="1"
+                                    Background="#F7F3EB"
+                                    BorderBrush="#D6C7B0"
+                                    BorderThickness="1"
+                                    CornerRadius="14"
+                                    Padding="16">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Frame Slots"
+                                               FontSize="16"
+                                               FontWeight="Bold" />
+                                    <ItemsControl ItemsSource="{Binding ViewerFrames}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ViewerFrameItemViewModel">
+                                                <Border Background="#FFFDFC"
+                                                        BorderBrush="#DED2C0"
+                                                        BorderThickness="1"
+                                                        CornerRadius="10"
+                                                        Padding="12"
+                                                        Margin="0,0,0,8">
+                                                    <Grid ColumnDefinitions="*,Auto,Auto"
+                                                          ColumnSpacing="10">
+                                                        <StackPanel Spacing="2">
+                                                            <TextBlock Text="{Binding FrameId}"
+                                                                       FontWeight="Bold" />
+                                                            <TextBlock Text="{Binding StateLabel}"
+                                                                       Foreground="#665A4A" />
+                                                            <TextBlock Text="{Binding RuntimeStateLabel}"
+                                                                       Foreground="#665A4A" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="{Binding Marker}"
+                                                                   VerticalAlignment="Center" />
+                                                        <Border Grid.Column="2"
+                                                                Background="#E8E3D8"
+                                                                CornerRadius="999"
+                                                                Padding="8,4"
+                                                                VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding FrameId}" />
+                                                        </Border>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="#FFFDFC"
+                        BorderBrush="#C9BDAA"
+                        BorderThickness="1"
+                        CornerRadius="16"
+                        Padding="18">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Species Coverage"
+                                   FontSize="16"
+                                   FontWeight="Bold" />
+                        <Grid ColumnDefinitions="2*,Auto,Auto,Auto"
+                              Margin="0,0,0,8">
+                            <TextBlock Text="Species"
+                                       FontWeight="Bold" />
+                            <TextBlock Grid.Column="1"
+                                       Text="Locomotion"
+                                       FontWeight="Bold"
+                                       Margin="16,0,0,0" />
+                            <TextBlock Grid.Column="2"
+                                       Text="Care"
+                                       FontWeight="Bold"
+                                       Margin="16,0,0,0" />
+                            <TextBlock Grid.Column="3"
+                                       Text="Expression"
+                                       FontWeight="Bold"
+                                       Margin="16,0,0,0" />
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding SpeciesCoverage}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SpeciesCoverageItemViewModel">
+                                    <Grid ColumnDefinitions="2*,Auto,Auto,Auto"
+                                          Margin="0,0,0,10">
+                                        <TextBlock Text="{Binding Species}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding Locomotion}"
+                                                   Margin="16,0,0,0" />
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding Care}"
+                                                   Margin="16,0,0,0" />
+                                        <TextBlock Grid.Column="3"
+                                                   Text="{Binding Expression}"
+                                                   Margin="16,0,0,0" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+
+</Window>

@@ -1,0 +1,103 @@
+{
+  "project_id": "wevito",
+  "display_name": "Wevito",
+  "root_path": "C:/Users/fishe/Documents/projects/wevito",
+  "runtime_sprite_root": "sprites_runtime",
+  "authored_sprite_root": "sprites_authored_verified",
+  "incoming_handoff_root": "incoming_sprites/gemini_handoff_motion",
+  "artifact_root": "vnext/artifacts",
+  "review_data_path": ".sprite-workflow/reviews.json",
+  "request_data_path": ".sprite-workflow/requests.json",
+  "variant_axes": {
+    "species": [
+      "crow",
+      "deer",
+      "fox",
+      "frog",
+      "goose",
+      "pigeon",
+      "raccoon",
+      "rat",
+      "snake",
+      "squirrel"
+    ],
+    "age": [
+      "adult",
+      "teen",
+      "baby"
+    ],
+    "gender": [
+      "female",
+      "male"
+    ],
+    "color": [
+      "red",
+      "orange",
+      "yellow",
+      "blue",
+      "indigo",
+      "violet"
+    ]
+  },
+  "families": {
+    "locomotion": [
+      {
+        "sequence_id": "idle",
+        "frame_count": 4
+      },
+      {
+        "sequence_id": "walk",
+        "frame_count": 6
+      }
+    ],
+    "care": [
+      {
+        "sequence_id": "eat",
+        "frame_count": 4
+      },
+      {
+        "sequence_id": "sleep",
+        "frame_count": 2
+      }
+    ],
+    "expression": [
+      {
+        "sequence_id": "happy",
+        "frame_count": 4
+      },
+      {
+        "sequence_id": "sad",
+        "frame_count": 2
+      },
+      {
+        "sequence_id": "sick",
+        "frame_count": 4
+      },
+      {
+        "sequence_id": "bathe",
+        "frame_count": 4
+      }
+    ]
+  },
+  "workflow_actions": [
+    {
+      "action_id": "rerender_previews",
+      "display_name": "Rerender Previews",
+      "command": "python",
+      "arguments": [
+        ".\\tools\\render_runtime_sprite_previews.py",
+        "--prefer-authored"
+      ],
+      "working_directory": "C:/Users/fishe/Documents/projects/wevito"
+    },
+    {
+      "action_id": "refresh_coverage",
+      "display_name": "Refresh Coverage",
+      "command": "python",
+      "arguments": [
+        ".\\tools\\report_authored_sprite_coverage.py"
+      ],
+      "working_directory": "C:/Users/fishe/Documents/projects/wevito"
+    }
+  ]
+}
