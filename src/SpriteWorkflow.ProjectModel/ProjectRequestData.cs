@@ -37,6 +37,21 @@ public sealed class ProjectRequestRecord
     [JsonPropertyName("source_note")]
     public string SourceNote { get; set; } = string.Empty;
 
+    [JsonPropertyName("history")]
+    public List<ProjectRequestHistoryRecord> History { get; set; } = [];
+
+    [JsonPropertyName("updated_utc")]
+    public DateTimeOffset? UpdatedUtc { get; set; }
+}
+
+public sealed class ProjectRequestHistoryRecord
+{
+    [JsonPropertyName("event_type")]
+    public string EventType { get; set; } = string.Empty;
+
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = string.Empty;
+
     [JsonPropertyName("updated_utc")]
     public DateTimeOffset? UpdatedUtc { get; set; }
 }

@@ -31,6 +31,9 @@ public sealed class ProjectConfig
     [JsonPropertyName("request_data_path")]
     public string RequestDataPath { get; set; } = string.Empty;
 
+    [JsonPropertyName("candidate_data_path")]
+    public string CandidateDataPath { get; set; } = string.Empty;
+
     [JsonPropertyName("variant_axes")]
     public VariantAxesConfig VariantAxes { get; set; } = new();
 
@@ -73,6 +76,12 @@ public sealed class WorkflowActionConfig
 
     [JsonPropertyName("display_name")]
     public string DisplayName { get; set; } = string.Empty;
+
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = string.Empty;
+
+    [JsonPropertyName("execution_mode")]
+    public string ExecutionMode { get; set; } = "hidden_process";
 
     [JsonPropertyName("command")]
     public string Command { get; set; } = string.Empty;

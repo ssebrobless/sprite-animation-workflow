@@ -8,6 +8,7 @@
   "artifact_root": "vnext/artifacts",
   "review_data_path": ".sprite-workflow/reviews.json",
   "request_data_path": ".sprite-workflow/requests.json",
+  "candidate_data_path": ".sprite-workflow/candidates.json",
   "variant_axes": {
     "species": [
       "crow",
@@ -81,8 +82,60 @@
   },
   "workflow_actions": [
     {
+      "action_id": "export_authoring_packs",
+      "display_name": "Export Authoring Packs",
+      "description": "Rebuild the reusable authoring packs for the full roster before another generation or review wave.",
+      "execution_mode": "hidden_process",
+      "command": "python",
+      "arguments": [
+        ".\\tools\\export_all_authoring_packs.py"
+      ],
+      "working_directory": "C:/Users/fishe/Documents/projects/wevito"
+    },
+    {
+      "action_id": "prepare_locomotion_handoffs",
+      "display_name": "Prepare Locomotion Handoffs",
+      "description": "Refresh all locomotion Gemini handoff folders and editable boards from the latest project state.",
+      "execution_mode": "hidden_process",
+      "command": "python",
+      "arguments": [
+        ".\\tools\\prepare_motion_gemini_handoff.py",
+        "--family",
+        "locomotion"
+      ],
+      "working_directory": "C:/Users/fishe/Documents/projects/wevito"
+    },
+    {
+      "action_id": "prepare_care_handoffs",
+      "display_name": "Prepare Care Handoffs",
+      "description": "Refresh all care-family Gemini handoff folders and editable boards from the latest project state.",
+      "execution_mode": "hidden_process",
+      "command": "python",
+      "arguments": [
+        ".\\tools\\prepare_motion_gemini_handoff.py",
+        "--family",
+        "care"
+      ],
+      "working_directory": "C:/Users/fishe/Documents/projects/wevito"
+    },
+    {
+      "action_id": "prepare_expression_handoffs",
+      "display_name": "Prepare Expression Handoffs",
+      "description": "Refresh all expression Gemini handoff folders and editable boards from the latest project state.",
+      "execution_mode": "hidden_process",
+      "command": "python",
+      "arguments": [
+        ".\\tools\\prepare_motion_gemini_handoff.py",
+        "--family",
+        "expression"
+      ],
+      "working_directory": "C:/Users/fishe/Documents/projects/wevito"
+    },
+    {
       "action_id": "rerender_previews",
       "display_name": "Rerender Previews",
+      "description": "Render the latest authored-first preview sheets for species-level visual QA.",
+      "execution_mode": "hidden_process",
       "command": "python",
       "arguments": [
         ".\\tools\\render_runtime_sprite_previews.py",
@@ -93,9 +146,34 @@
     {
       "action_id": "refresh_coverage",
       "display_name": "Refresh Coverage",
+      "description": "Recompute authored coverage and progress summaries from the on-disk sprite tree.",
+      "execution_mode": "hidden_process",
       "command": "python",
       "arguments": [
         ".\\tools\\report_authored_sprite_coverage.py"
+      ],
+      "working_directory": "C:/Users/fishe/Documents/projects/wevito"
+    },
+    {
+      "action_id": "audit_sprite_contract",
+      "display_name": "Audit Sprite Contract",
+      "description": "Check the canonical source and runtime trees against the expected Wevito sprite contract.",
+      "execution_mode": "hidden_process",
+      "command": "python",
+      "arguments": [
+        ".\\tools\\audit_sprite_contract.py"
+      ],
+      "working_directory": "C:/Users/fishe/Documents/projects/wevito"
+    },
+    {
+      "action_id": "gemini_generation_external",
+      "display_name": "Gemini Generation",
+      "description": "Continue generation in the existing logged-in Gemini window after the handoff packs are prepared. This stays external until the app has a safer direct integration.",
+      "execution_mode": "manual_browser",
+      "command": "Use the existing Gemini Chrome window",
+      "arguments": [
+        "Prepare handoffs in-app first",
+        "Then continue generation manually in the current logged-in chat/window"
       ],
       "working_directory": "C:/Users/fishe/Documents/projects/wevito"
     }

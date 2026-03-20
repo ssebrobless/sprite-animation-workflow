@@ -18,7 +18,10 @@ public sealed class ProjectConfigTests
         Assert.Contains("crow", config.VariantAxes.Species);
         Assert.Equal(".sprite-workflow/reviews.json", config.ReviewDataPath);
         Assert.Equal(".sprite-workflow/requests.json", config.RequestDataPath);
+        Assert.Equal(".sprite-workflow/candidates.json", config.CandidateDataPath);
         Assert.Contains(config.WorkflowActions, action => action.ActionId == "refresh_coverage");
+        Assert.Contains(config.WorkflowActions, action => action.ActionId == "prepare_expression_handoffs" && action.ExecutionMode == "hidden_process");
+        Assert.Contains(config.WorkflowActions, action => action.ActionId == "gemini_generation_external" && action.ExecutionMode == "manual_browser");
     }
 
     [Fact]
@@ -34,7 +37,7 @@ public sealed class ProjectConfigTests
 
         Assert.Contains(
             reviewData.BaseVariantReviews,
-            review => review.Species == "fox" && review.Age == "teen" && review.Gender == "male" && review.Status == "to_be_repaired");
+            review => review.Species == "fox" && review.Age == "teen" && review.Gender == "male" && review.Status == "approved");
     }
 
     [Fact]
@@ -51,6 +54,21 @@ public sealed class ProjectConfigTests
         Assert.Contains(
             requestData.Requests,
             request => request.RequestId == "repair-fox-teen-male-expression" && request.RequestType == "repair_existing");
+    }
+
+    [Fact]
+    public void WevitoSampleCandidateStore_LoadsCandidateFile()
+    {
+        var candidatePath = Path.Combine(
+            @"C:\Users\fishe\Documents\projects\wevito",
+            ".sprite-workflow",
+            "candidates.json");
+        var store = new JsonProjectCandidateStore();
+
+        var candidateData = store.Load(candidatePath);
+
+        Assert.NotNull(candidateData);
+        Assert.NotNull(candidateData.Candidates);
     }
 
     private static string FindRepositoryRoot()

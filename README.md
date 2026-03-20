@@ -1,64 +1,76 @@
 # Sprite Animation Workflow
 
-Updated: 2026-03-18
+Updated: 2026-03-20
 
 ```text
-+---------------------------------------------------------------+
-| Repository Layout                                             |
-|                                                               |
-| SPRITE_PIPELINE_KIT/                                          |
-|   reusable workflow kit, bootstrap, templates                 |
-| tools/                                                        |
-|   reusable bootstrap implementation                           |
-| REUSABLE_SPRITE_PIPELINE_PLAYBOOK.md                          |
-|   long-form workflow reference                                |
-|                                                               |
-| src/                                                          |
-|   cross-platform Sprite Workflow App                          |
-| sample-projects/                                              |
-|   project profiles, starting with Wevito                      |
-| docs/                                                         |
-|   app product spec and v1 backlog                             |
-+---------------------------------------------------------------+
+╔══ Repo Layout ═══════════════════════════════════════════════════════╗
+║ SPRITE_PIPELINE_KIT/                                                ║
+║   reusable workflow bundle, templates, bootstrap                    ║
+║ tools/                                                              ║
+║   launchers and reusable helper scripts                             ║
+║ src/                                                                ║
+║   Sprite Workflow App + core libraries                              ║
+║ sample-projects/                                                    ║
+║   linked project profiles, starting with Wevito                     ║
+║ docs/                                                               ║
+║   roadmap, product spec, backlog                                    ║
+╚══════════════════════════════════════════════════════════════════════╝
 ```
 
-This repository now contains both:
+This repository serves two purposes:
 
-- the standalone reusable sprite and animation workflow bundle extracted from the Wevito process
-- the new cross-platform `Sprite Workflow App` desktop application built to browse, review, repair, and request sprite and animation work across projects
-
-## Start Here
-
-If you want the reusable workflow bundle first, open:
-
-- `SPRITE_PIPELINE_KIT/FUTURE_SPRITE_ANIMATION_GUIDELINE.md`
-- `SPRITE_PIPELINE_KIT/README.md`
-- `SPRITE_PIPELINE_KIT/PROCESS_PLAYBOOK.md`
-- `SPRITE_PIPELINE_KIT/PRESET_GUIDE.md`
-- `REUSABLE_SPRITE_PIPELINE_PLAYBOOK.md`
-
-If you want the desktop app first, open:
-
-- `docs/PRODUCT_SPEC.md`
-- `docs/V1_BACKLOG.md`
-- `sample-projects/wevito.project.json`
+- a reusable sprite/animation workflow bundle
+- a cross-platform desktop app for planning, reviewing, editing, staging, and exporting sprite work
 
 ## Sprite Workflow App
 
-The app is a separate cross-platform desktop tool for sprite and animation generation workflows.
-Wevito is the first configured project profile.
+The app is a manual-first sprite workstation with visible AI assistance layered on top.
 
-Current app features:
+Current app capabilities:
 
-- project profile loading
-- authored coverage indexing
-- filterable asset browser
-- authored vs runtime animation compare viewer
-- row-level review notes and statuses
-- repair queue
-- request drafting, saving, and exportable AI handoff text
+- load a project profile and discover existing authored/runtime assets
+- plan a blank project from scratch or adopt an existing sprite tree
+- browse rows by species, age, gender, family, coverage, and review state
+- review animations with frozen edit frames, live playback, onion skin, and compare tools
+- paint directly in-app with layers, palettes, selection tools, lasso, shapes, transforms, history, and reference layers
+- save frame-level notes, statuses, issue tags, and approval state
+- stage authored, runtime, and editor-canvas candidates before import
+- build AI requests and keep visible AI task/activity history
+- export trusted sets, validation reports, project kits, and blank validation sandboxes
 
-Solution layout:
+## Start Here
+
+Primary roadmap:
+
+- [PERFECT_LOOP_EXECUTION_PLAN.md](C:/Users/fishe/Documents/projects/sprite-workflow-app/docs/PERFECT_LOOP_EXECUTION_PLAN.md)
+- [PERFECT_LOOP_MILESTONE_BACKLOG.md](C:/Users/fishe/Documents/projects/sprite-workflow-app/docs/PERFECT_LOOP_MILESTONE_BACKLOG.md)
+- [PRODUCT_SPEC.md](C:/Users/fishe/Documents/projects/sprite-workflow-app/docs/PRODUCT_SPEC.md)
+
+First sample profile:
+
+- [wevito.project.json](C:/Users/fishe/Documents/projects/sprite-workflow-app/sample-projects/wevito.project.json)
+
+## Run
+
+Preferred Windows launch:
+
+```text
+tools\launch_sprite_workflow_app.vbs
+```
+
+No-console PowerShell launch:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\launch_sprite_workflow_app.ps1
+```
+
+Test the solution:
+
+```powershell
+dotnet test .\SpriteWorkflow.sln
+```
+
+## Solution
 
 ```text
 src/
@@ -69,48 +81,19 @@ src/
   SpriteWorkflow.Tests/
 ```
 
-Run the app:
+## Reusable Workflow Bundle
 
-```powershell
-dotnet run --project .\src\SpriteWorkflow.App\SpriteWorkflow.App.csproj
-```
+If you want the reusable docs/bootstrap first, start with:
 
-Run tests:
-
-```powershell
-dotnet test .\SpriteWorkflow.sln
-```
+- `SPRITE_PIPELINE_KIT/README.md`
+- `SPRITE_PIPELINE_KIT/PROCESS_PLAYBOOK.md`
+- `SPRITE_PIPELINE_KIT/FUTURE_SPRITE_ANIMATION_GUIDELINE.md`
+- `REUSABLE_SPRITE_PIPELINE_PLAYBOOK.md`
 
 ## Bootstrap A New Project
-
-From the repository root:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\SPRITE_PIPELINE_KIT\bootstrap_sprite_pipeline.ps1 -TargetRoot "C:\path\to\new-project" -ProjectName "New Project" -Preset generic
 ```
 
-That scaffold will create:
-
-- `docs/SPRITE_SOURCE_OF_TRUTH.md`
-- `docs/MOTION_AUTHORING_ROADMAP.md`
-- `docs/SPRITE_PIPELINE_CHECKLIST.md`
-- `docs/GEMINI_PROMPT_RULES.md`
-- `docs/SPRITE_PIPELINE_START_HERE.md`
-- `tools/incoming_sprite_manifest.json`
-- `tools/motion_families.json`
-
-## What Is Included
-
-- the compiled future-facing guideline
-- the concise repeatable playbook
-- the preset guide
-- the PowerShell bootstrap wrapper
-- the Python bootstrap implementation
-- the reusable templates
-- the long-form reference playbook
-- the new Avalonia-based desktop workflow app
-
-## Notes
-
-- The bundle keeps the working relative layout between `SPRITE_PIPELINE_KIT` and `tools`, so the bootstrap command works from here.
-- The app lives alongside the reusable docs so the repository can serve both as a workflow reference and as the long-term production tool.
+That scaffold creates the starter docs, manifests, motion-family definitions, and project structure needed to begin a new sprite pipeline.
