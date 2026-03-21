@@ -1,7 +1,8 @@
 {
+  "schema_version": 1,
   "project_id": "wevito",
   "display_name": "Wevito",
-  "root_path": "C:/Users/fishe/Documents/projects/wevito",
+  "root_path": "C:/path/to/wevito",
   "runtime_sprite_root": "sprites_runtime",
   "authored_sprite_root": "sprites_authored_verified",
   "incoming_handoff_root": "incoming_sprites/gemini_handoff_motion",
@@ -9,6 +10,25 @@
   "review_data_path": ".sprite-workflow/reviews.json",
   "request_data_path": ".sprite-workflow/requests.json",
   "candidate_data_path": ".sprite-workflow/candidates.json",
+  "default_ai_provider_id": "gemini-browser",
+  "ai_providers": [
+    {
+      "provider_id": "gemini-browser",
+      "display_name": "Gemini Browser Workflow",
+      "provider_kind": "browser_chat",
+      "execution_mode": "manual_browser",
+      "supports_automation": false,
+      "notes": "Keeps Gemini as a visible browser-driven provider adapter without baking Gemini assumptions into the shared request or candidate model."
+    },
+    {
+      "provider_id": "local-hidden-tools",
+      "display_name": "Local Hidden Workflow Tools",
+      "provider_kind": "local_process",
+      "execution_mode": "hidden_process",
+      "supports_automation": true,
+      "notes": "Runs local preparation, validation, and export actions as hidden child processes owned by the app."
+    }
+  ],
   "variant_axes": {
     "species": [
       "crow",
@@ -90,7 +110,7 @@
       "arguments": [
         ".\\tools\\export_all_authoring_packs.py"
       ],
-      "working_directory": "C:/Users/fishe/Documents/projects/wevito"
+      "working_directory": "C:/path/to/wevito"
     },
     {
       "action_id": "prepare_locomotion_handoffs",
@@ -103,7 +123,7 @@
         "--family",
         "locomotion"
       ],
-      "working_directory": "C:/Users/fishe/Documents/projects/wevito"
+      "working_directory": "C:/path/to/wevito"
     },
     {
       "action_id": "prepare_care_handoffs",
@@ -116,7 +136,7 @@
         "--family",
         "care"
       ],
-      "working_directory": "C:/Users/fishe/Documents/projects/wevito"
+      "working_directory": "C:/path/to/wevito"
     },
     {
       "action_id": "prepare_expression_handoffs",
@@ -129,7 +149,7 @@
         "--family",
         "expression"
       ],
-      "working_directory": "C:/Users/fishe/Documents/projects/wevito"
+      "working_directory": "C:/path/to/wevito"
     },
     {
       "action_id": "rerender_previews",
@@ -141,7 +161,7 @@
         ".\\tools\\render_runtime_sprite_previews.py",
         "--prefer-authored"
       ],
-      "working_directory": "C:/Users/fishe/Documents/projects/wevito"
+      "working_directory": "C:/path/to/wevito"
     },
     {
       "action_id": "refresh_coverage",
@@ -152,7 +172,7 @@
       "arguments": [
         ".\\tools\\report_authored_sprite_coverage.py"
       ],
-      "working_directory": "C:/Users/fishe/Documents/projects/wevito"
+      "working_directory": "C:/path/to/wevito"
     },
     {
       "action_id": "audit_sprite_contract",
@@ -163,7 +183,7 @@
       "arguments": [
         ".\\tools\\audit_sprite_contract.py"
       ],
-      "working_directory": "C:/Users/fishe/Documents/projects/wevito"
+      "working_directory": "C:/path/to/wevito"
     },
     {
       "action_id": "gemini_generation_external",
@@ -175,7 +195,7 @@
         "Prepare handoffs in-app first",
         "Then continue generation manually in the current logged-in chat/window"
       ],
-      "working_directory": "C:/Users/fishe/Documents/projects/wevito"
+      "working_directory": "C:/path/to/wevito"
     }
   ]
 }

@@ -4,6 +4,9 @@ namespace SpriteWorkflow.ProjectModel;
 
 public sealed class ProjectRequestData
 {
+    [JsonPropertyName("schema_version")]
+    public int SchemaVersion { get; set; } = 1;
+
     [JsonPropertyName("requests")]
     public List<ProjectRequestRecord> Requests { get; set; } = [];
 }

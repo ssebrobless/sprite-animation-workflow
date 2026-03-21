@@ -62,14 +62,16 @@
             </StackPanel>
         </Border>
 
-        <ScrollViewer Grid.Row="1"
-                      Margin="22">
-            <StackPanel Spacing="16">
+        <Grid Grid.Row="1"
+              Margin="22"
+              RowDefinitions="Auto,*"
+              RowSpacing="12">
                 <Border Background="{DynamicResource SurfaceBrush}"
                         BorderBrush="{DynamicResource BorderBrushDark}"
                         BorderThickness="1"
                         CornerRadius="16"
-                        Padding="22">
+                        Padding="22"
+                        IsVisible="False">
                     <StackPanel Spacing="8">
                         <TextBlock Text="Selected Project"
                                    FontSize="16"
@@ -86,7 +88,306 @@
                     </StackPanel>
                 </Border>
 
-                <Grid ColumnDefinitions="*,*,*">
+                <Border Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrushDark}"
+                        BorderThickness="1"
+                        CornerRadius="16"
+                        Padding="12"
+                        IsVisible="{Binding HasCurrentTask}">
+                    <Grid ColumnDefinitions="1.4*,1.6*"
+                          ColumnSpacing="14">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto"
+                                  ColumnSpacing="10">
+                                <TextBlock Text="Current Task"
+                                           FontSize="15"
+                                           FontWeight="Bold" />
+                                <Button Grid.Column="1"
+                                        Content="Focus"
+                                        Command="{Binding FocusCurrentTaskCommand}"
+                                        HorizontalAlignment="Right" />
+                            </Grid>
+                            <TextBlock Text="{Binding CurrentTaskTitle}"
+                                       FontSize="18"
+                                       FontWeight="Bold" />
+                            <TextBlock Text="{Binding CurrentTaskSummary}"
+                                       TextWrapping="Wrap"
+                                       MaxLines="2" />
+                            <TextBlock Text="{Binding CurrentTaskTargetSummary}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       MaxLines="1" />
+                            <TextBlock Text="{Binding CurrentTaskWorkspaceHint}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       MaxLines="2" />
+                            <TextBlock Text="{Binding LiveOperationStatusMessage}"
+                                       FontWeight="Bold"
+                                       TextWrapping="Wrap"
+                                       MaxLines="1" />
+                            <TextBlock Text="{Binding LiveOperationProgressSummary}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       MaxLines="1" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1"
+                                    Spacing="6">
+                            <Grid ColumnDefinitions="Auto,Auto,*"
+                                  ColumnSpacing="8">
+                                <Button Content="Open Animate"
+                                        Command="{Binding OpenAnimateWorkspaceCommand}" />
+                                <Button Grid.Column="1"
+                                        Content="Open Paint"
+                                        Command="{Binding OpenPaintWorkspaceCommand}" />
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding LiveWorkMonitorSummary}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap"
+                                           MaxLines="2"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,*,*"
+                                  ColumnSpacing="8">
+                                <Border Background="{DynamicResource SurfaceAltBrush}"
+                                        BorderBrush="{DynamicResource BorderBrushDark}"
+                                        BorderThickness="1"
+                                        CornerRadius="10"
+                                        Padding="6">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="Target"
+                                                   FontWeight="Bold"
+                                                   FontSize="12" />
+                                        <Image Source="{Binding CurrentFrameBitmap}"
+                                               Stretch="Uniform"
+                                               Height="72"
+                                               IsVisible="{Binding HasCurrentFrameBitmap}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="1"
+                                        Background="{DynamicResource SurfaceAltBrush}"
+                                        BorderBrush="{DynamicResource BorderBrushDark}"
+                                        BorderThickness="1"
+                                        CornerRadius="10"
+                                        Padding="6">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="Paint"
+                                                   FontWeight="Bold"
+                                                   FontSize="12" />
+                                        <Image Source="{Binding EditorPreviewBitmap}"
+                                               Stretch="Uniform"
+                                               Height="72"
+                                               IsVisible="{Binding IsEditorFrameLoaded}" />
+                                        <TextBlock Text="No frame"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   IsVisible="{Binding IsEditorFrameMissing}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="2"
+                                        Background="{DynamicResource SurfaceAltBrush}"
+                                        BorderBrush="{DynamicResource BorderBrushDark}"
+                                        BorderThickness="1"
+                                        CornerRadius="10"
+                                        Padding="6">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="Playback"
+                                                   FontWeight="Bold"
+                                                   FontSize="12" />
+                                        <Image Source="{Binding PlaybackFrameBitmap}"
+                                               Stretch="Uniform"
+                                               Height="72"
+                                               IsVisible="{Binding HasPlaybackFrameBitmap}" />
+                                        <TextBlock Text="No playback"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   IsVisible="{Binding IsPlaybackFrameBitmapMissing}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                            <ScrollViewer MaxHeight="54"
+                                          VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding LiveOperationSteps}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:LiveOperationStepItemViewModel">
+                                            <Grid ColumnDefinitions="Auto,Auto,*"
+                                                  ColumnSpacing="8"
+                                                  Margin="0,0,0,4">
+                                                <Border Background="{DynamicResource AccentPillBrush}"
+                                                        CornerRadius="999"
+                                                        Padding="8,2">
+                                                    <TextBlock Text="{Binding StatusLabel}"
+                                                               FontWeight="Bold" />
+                                                </Border>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding Label}"
+                                                           FontWeight="Bold" />
+                                                <TextBlock Grid.Column="2"
+                                                           Text="{Binding Summary}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           TextWrapping="Wrap"
+                                                           MaxLines="1" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrushDark}"
+                        BorderThickness="1"
+                        CornerRadius="16"
+                        Padding="12">
+                    <Border.IsVisible>False</Border.IsVisible>
+                    <StackPanel Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto,Auto"
+                              ColumnSpacing="10">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Live Work Monitor"
+                                           FontSize="15"
+                                           FontWeight="Bold" />
+                                <TextBlock Text="{Binding LiveWorkMonitorSummary}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap"
+                                           MaxLines="1" />
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                    Content="Open Animate"
+                                    Command="{Binding OpenAnimateWorkspaceCommand}"
+                                    VerticalAlignment="Top" />
+                            <Button Grid.Column="2"
+                                    Content="Open Paint"
+                                    Command="{Binding OpenPaintWorkspaceCommand}"
+                                    VerticalAlignment="Top" />
+                        </Grid>
+                        <TextBlock Text="{Binding LiveOperationStatusMessage}"
+                                   FontWeight="Bold"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding LiveOperationProgressSummary}"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" />
+                        <ScrollViewer MaxHeight="88"
+                                      VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding LiveOperationSteps}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:LiveOperationStepItemViewModel">
+                                        <Border Background="{DynamicResource SurfaceAltBrush}"
+                                                BorderBrush="{DynamicResource BorderBrushDark}"
+                                                BorderThickness="1"
+                                                CornerRadius="10"
+                                                Padding="8"
+                                                Margin="0,0,0,6">
+                                            <Grid ColumnDefinitions="Auto,Auto,*"
+                                                  ColumnSpacing="8">
+                                                <Border Background="{DynamicResource AccentPillBrush}"
+                                                        CornerRadius="999"
+                                                        Padding="8,2"
+                                                        VerticalAlignment="Top">
+                                                    <TextBlock Text="{Binding StatusLabel}"
+                                                               FontWeight="Bold" />
+                                                </Border>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding Label}"
+                                                           FontWeight="Bold"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2"
+                                                           Text="{Binding Summary}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           TextWrapping="Wrap"
+                                                           MaxLines="1"
+                                                           VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                        <Grid ColumnDefinitions="*,*,*,*"
+                              ColumnSpacing="12">
+                            <Border Background="{DynamicResource SurfaceAltBrush}"
+                                    BorderBrush="{DynamicResource BorderBrushDark}"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="10">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Authored Target"
+                                               FontWeight="Bold" />
+                                    <Image Source="{Binding CurrentFrameBitmap}"
+                                           Stretch="Uniform"
+                                           Height="112"
+                                           IsVisible="{Binding HasCurrentFrameBitmap}" />
+                                    <TextBlock Text="{Binding CurrentFrameActionSummary}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextWrapping="Wrap"
+                                               IsVisible="{Binding IsCurrentFrameBitmapMissing}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="1"
+                                    Background="{DynamicResource SurfaceAltBrush}"
+                                    BorderBrush="{DynamicResource BorderBrushDark}"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="10">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Live Paint Canvas"
+                                               FontWeight="Bold" />
+                                    <Image Source="{Binding EditorPreviewBitmap}"
+                                           Stretch="Uniform"
+                                           Height="112"
+                                           IsVisible="{Binding IsEditorFrameLoaded}" />
+                                    <TextBlock Text="{Binding EditorEmptyStateSummary}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextWrapping="Wrap"
+                                               MaxLines="2"
+                                               IsVisible="{Binding IsEditorFrameMissing}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2"
+                                    Background="{DynamicResource SurfaceAltBrush}"
+                                    BorderBrush="{DynamicResource BorderBrushDark}"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="10">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Live Playback"
+                                               FontWeight="Bold" />
+                                    <Image Source="{Binding PlaybackFrameBitmap}"
+                                           Stretch="Uniform"
+                                           Height="112"
+                                           IsVisible="{Binding HasPlaybackFrameBitmap}" />
+                                    <TextBlock Text="{Binding LivePlaybackSummary}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextWrapping="Wrap"
+                                               MaxLines="2"
+                                               IsVisible="{Binding IsPlaybackFrameBitmapMissing}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="3"
+                                    Background="{DynamicResource SurfaceAltBrush}"
+                                    BorderBrush="{DynamicResource BorderBrushDark}"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="10">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Edit Diff"
+                                               FontWeight="Bold" />
+                                    <Image Source="{Binding EditorDiffBitmap}"
+                                           Stretch="Uniform"
+                                           Height="112"
+                                           IsVisible="{Binding HasEditorDiffBitmap}" />
+                                    <TextBlock Text="{Binding LiveDiffSummary}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextWrapping="Wrap"
+                                               MaxLines="2" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Grid ColumnDefinitions="*,*,*"
+                      IsVisible="False">
                     <Border Grid.Column="0"
                             Background="{DynamicResource SurfaceAltBrush}"
                             BorderBrush="{DynamicResource BorderBrushDark}"
@@ -140,7 +441,8 @@
                         BorderBrush="{DynamicResource BorderBrushDark}"
                         BorderThickness="1"
                         CornerRadius="16"
-                        Padding="18">
+                        Padding="18"
+                        IsVisible="False">
                     <StackPanel Spacing="10">
                         <Grid ColumnDefinitions="*,Auto"
                               ColumnSpacing="10">
@@ -199,7 +501,8 @@
                         BorderBrush="{DynamicResource BorderBrushDark}"
                         BorderThickness="1"
                         CornerRadius="16"
-                        Padding="18">
+                        Padding="18"
+                        IsVisible="False">
                     <StackPanel Spacing="12">
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="4">
@@ -326,7 +629,8 @@
                     </StackPanel>
                 </Border>
 
-                <TabControl Margin="0,6,0,0"
+                <TabControl Grid.Row="1"
+                            Margin="0"
                             SelectedIndex="{Binding SelectedWorkspaceTabIndex}">
                     <TabItem Header="Automation">
                     <Grid ColumnDefinitions="*,*"
@@ -388,6 +692,62 @@
                                         Content="Stop All Automation"
                                         Command="{Binding StopAllAutomationCommand}" />
                             </Grid>
+                            <Border Background="{DynamicResource SurfaceAltBrush}"
+                                    BorderBrush="{DynamicResource BorderBrushDark}"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Padding="12">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Provider Adapters"
+                                               FontWeight="Bold" />
+                                    <TextBlock Text="{Binding AiProviderSummary}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding DefaultAiProviderSummary}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextWrapping="Wrap" />
+                                    <ItemsControl ItemsSource="{Binding AiProviders}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:AiProviderItemViewModel">
+                                                <Border Background="{DynamicResource SurfaceBrush}"
+                                                        BorderBrush="{DynamicResource BorderBrushDark}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="10"
+                                                        Padding="10"
+                                                        Margin="0,0,0,8">
+                                                    <StackPanel Spacing="4">
+                                                        <Grid ColumnDefinitions="*,Auto,Auto"
+                                                              ColumnSpacing="8">
+                                                            <TextBlock Text="{Binding DisplayName}"
+                                                                       FontWeight="Bold"
+                                                                       TextWrapping="Wrap" />
+                                                            <Border Grid.Column="1"
+                                                                    Background="{DynamicResource AccentPillBrush}"
+                                                                    CornerRadius="999"
+                                                                    Padding="8,3">
+                                                                <TextBlock Text="{Binding KindLabel}" />
+                                                            </Border>
+                                                            <Border Grid.Column="2"
+                                                                    Background="{DynamicResource AccentAuditBrush}"
+                                                                    CornerRadius="999"
+                                                                    Padding="8,3">
+                                                                <TextBlock Text="{Binding DefaultLabel}" />
+                                                            </Border>
+                                                        </Grid>
+                                                        <TextBlock Text="{Binding Summary}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding AutomationLabel}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                                                        <TextBlock Text="{Binding ExecutionModeLabel}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
                             <Border Background="{DynamicResource SurfaceAltBrush}"
                                     BorderBrush="{DynamicResource BorderBrushDark}"
                                     BorderThickness="1"
@@ -1429,6 +1789,9 @@
                                                         <TextBlock Text="{Binding TargetScope}"
                                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                                    TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding HealthSummary}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   TextWrapping="Wrap" />
                                                         <TextBlock Text="{Binding UpdatedLabel}"
                                                                    Foreground="{DynamicResource TextSecondaryBrush}" />
                                                     </StackPanel>
@@ -1555,6 +1918,19 @@
                                             <TextBlock Text="{Binding SelectedRequestHistorySummary}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                                        TextWrapping="Wrap" />
+                                            <Border Background="{DynamicResource SurfaceBrush}"
+                                                    BorderBrush="{DynamicResource BorderBrushDark}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="10"
+                                                    Padding="12">
+                                                <StackPanel Spacing="6">
+                                                    <TextBlock Text="Current Request Health"
+                                                               FontWeight="Bold" />
+                                                    <TextBlock Text="{Binding SelectedRequestHealthSummary}"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </Border>
                                             <Border Background="{DynamicResource SurfaceBrush}"
                                                     BorderBrush="{DynamicResource BorderBrushDark}"
                                                     BorderThickness="1"
@@ -2394,6 +2770,753 @@
                         </TabItem>
 
                         <TabItem Header="Paint">
+                            <Grid RowDefinitions="Auto,Auto,*,Auto"
+                                  RowSpacing="12"
+                                  Margin="0,6,0,0">
+                                <TextBlock Text="Paint shortcuts: M select | A lasso | G move | B brush | E erase | I dropper | F fill | L line | R rectangle | O ellipse"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap" />
+                                <Border Grid.Row="1"
+                                        Background="{DynamicResource AccentPillBrush}"
+                                        CornerRadius="12"
+                                        Padding="12">
+                                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto"
+                                          ColumnSpacing="8">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Text="{Binding PaintEditTargetTitle}"
+                                                       FontSize="16"
+                                                       FontWeight="Bold"
+                                                       TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding PaintEditTargetSummary}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding PaintNextStepSummary}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1"
+                                                Content="Load Current"
+                                                Command="{Binding LoadCurrentFrameIntoEditorCommand}" />
+                                        <Button Grid.Column="2"
+                                                Content="Load Template"
+                                                Command="{Binding LoadRuntimeFrameIntoEditorCommand}" />
+                                        <Button Grid.Column="3"
+                                                Content="Save"
+                                                Command="{Binding SaveEditedFrameCommand}" />
+                                        <Button Grid.Column="4"
+                                                Content="Save + Replay"
+                                                Command="{Binding SaveAndReturnToAnimateCommand}" />
+                                    </Grid>
+                                </Border>
+                                <Grid Grid.Row="2"
+                                      ColumnDefinitions="300,*,320"
+                                      ColumnSpacing="12">
+                                    <Border Background="{DynamicResource SurfaceBrush}"
+                                            BorderBrush="{DynamicResource BorderBrushDark}"
+                                            BorderThickness="1"
+                                            CornerRadius="12"
+                                            Padding="12">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                            <StackPanel Spacing="12">
+                                                <Border Background="{DynamicResource SurfaceAltBrush}"
+                                                        BorderBrush="{DynamicResource BorderBrushDark}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="10"
+                                                        Padding="10">
+                                                    <StackPanel Spacing="8">
+                                                        <TextBlock Text="Tools"
+                                                                   FontWeight="Bold" />
+                                                        <Grid ColumnDefinitions="*,Auto"
+                                                              ColumnSpacing="8">
+                                                            <StackPanel Spacing="6">
+                                                                <TextBlock Text="Tool"
+                                                                           FontWeight="Bold" />
+                                                                <ComboBox ItemsSource="{Binding EditorToolOptions}"
+                                                                          SelectedItem="{Binding SelectedEditorTool}" />
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="1"
+                                                                        Spacing="6">
+                                                                <TextBlock Text="Brush"
+                                                                           FontWeight="Bold" />
+                                                                <ComboBox ItemsSource="{Binding EditorBrushSizeOptions}"
+                                                                          SelectedItem="{Binding SelectedEditorBrushSize}"
+                                                                          MinWidth="74" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                        <Grid ColumnDefinitions="*,Auto"
+                                                              ColumnSpacing="8">
+                                                            <StackPanel Spacing="6">
+                                                                <TextBlock Text="Zoom"
+                                                                           FontWeight="Bold" />
+                                                                <ComboBox ItemsSource="{Binding EditorZoomOptions}"
+                                                                          SelectedItem="{Binding SelectedEditorZoom}"
+                                                                          MinWidth="90" />
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="1"
+                                                                        Spacing="6">
+                                                                <TextBlock Text="Color"
+                                                                           FontWeight="Bold" />
+                                                                <TextBox Text="{Binding SelectedEditorColorHex}"
+                                                                         MinWidth="104" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                        <StackPanel Orientation="Horizontal"
+                                                                    Spacing="10">
+                                                            <CheckBox Content="Mirror H"
+                                                                      IsChecked="{Binding EditorMirrorHorizontal}" />
+                                                            <CheckBox Content="Mirror V"
+                                                                      IsChecked="{Binding EditorMirrorVertical}" />
+                                                            <CheckBox Content="Fill"
+                                                                      IsChecked="{Binding EditorFillShapes}" />
+                                                        </StackPanel>
+                                                        <TextBlock Text="{Binding SelectedEditorColorSummary}"
+                                                                   FontWeight="Bold"
+                                                                   TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding EditorCanvasSummary}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding EditorSelectionSummary}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding EditorToolHint}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   TextWrapping="Wrap" />
+                                                        <StackPanel Orientation="Horizontal"
+                                                                    Spacing="8">
+                                                            <Button Content="Undo"
+                                                                    Command="{Binding UndoEditorEditCommand}" />
+                                                            <Button Content="Redo"
+                                                                    Command="{Binding RedoEditorEditCommand}" />
+                                                            <Button Content="Revert"
+                                                                    Command="{Binding RevertEditedFrameCommand}" />
+                                                            <Button Content="Clear"
+                                                                    Command="{Binding ClearEditorFrameCommand}" />
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <Expander Header="Color"
+                                                          IsExpanded="True">
+                                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                                            BorderBrush="{DynamicResource BorderBrushDark}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="10"
+                                                            Padding="10">
+                                                        <StackPanel Spacing="8">
+                                                            <Border Width="56"
+                                                                    Height="56"
+                                                                    Background="{Binding EditorSelectedColorBrush}"
+                                                                    BorderBrush="{DynamicResource BorderBrushDark}"
+                                                                    BorderThickness="1"
+                                                                    CornerRadius="8" />
+                                                            <Grid ColumnDefinitions="Auto,*,Auto"
+                                                                  ColumnSpacing="8">
+                                                                <TextBlock Text="R" VerticalAlignment="Center" />
+                                                                <Slider Grid.Column="1" Minimum="0" Maximum="255" Value="{Binding EditorRed}" />
+                                                                <TextBlock Grid.Column="2" Text="{Binding EditorRed}" VerticalAlignment="Center" />
+                                                            </Grid>
+                                                            <Grid ColumnDefinitions="Auto,*,Auto"
+                                                                  ColumnSpacing="8">
+                                                                <TextBlock Text="G" VerticalAlignment="Center" />
+                                                                <Slider Grid.Column="1" Minimum="0" Maximum="255" Value="{Binding EditorGreen}" />
+                                                                <TextBlock Grid.Column="2" Text="{Binding EditorGreen}" VerticalAlignment="Center" />
+                                                            </Grid>
+                                                            <Grid ColumnDefinitions="Auto,*,Auto"
+                                                                  ColumnSpacing="8">
+                                                                <TextBlock Text="B" VerticalAlignment="Center" />
+                                                                <Slider Grid.Column="1" Minimum="0" Maximum="255" Value="{Binding EditorBlue}" />
+                                                                <TextBlock Grid.Column="2" Text="{Binding EditorBlue}" VerticalAlignment="Center" />
+                                                            </Grid>
+                                                            <Grid ColumnDefinitions="Auto,*,Auto"
+                                                                  ColumnSpacing="8">
+                                                                <TextBlock Text="A" VerticalAlignment="Center" />
+                                                                <Slider Grid.Column="1" Minimum="0" Maximum="255" Value="{Binding EditorAlpha}" />
+                                                                <TextBlock Grid.Column="2" Text="{Binding EditorAlpha}" VerticalAlignment="Center" />
+                                                            </Grid>
+                                                            <TextBlock Text="{Binding EditorHsvSummary}"
+                                                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                                                            <ItemsControl ItemsSource="{Binding EditorHuePresets}">
+                                                                <ItemsControl.ItemsPanel>
+                                                                    <ItemsPanelTemplate>
+                                                                        <WrapPanel Orientation="Horizontal" />
+                                                                    </ItemsPanelTemplate>
+                                                                </ItemsControl.ItemsPanel>
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate x:DataType="vm:ColorPresetItemViewModel">
+                                                                        <Button Width="24"
+                                                                                Height="24"
+                                                                                Margin="0,0,6,6"
+                                                                                Padding="0"
+                                                                                Command="{Binding #Root.DataContext.UseQuickColorPresetCommand}"
+                                                                                CommandParameter="{Binding .}">
+                                                                            <Border Background="{Binding Brush}"
+                                                                                    BorderBrush="{DynamicResource BorderBrushDark}"
+                                                                                    BorderThickness="1"
+                                                                                    CornerRadius="12" />
+                                                                        </Button>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </Expander>
+
+                                                <Expander Header="Layers"
+                                                          IsExpanded="False">
+                                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                                            BorderBrush="{DynamicResource BorderBrushDark}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="10"
+                                                            Padding="10">
+                                                        <StackPanel Spacing="8">
+                                                            <TextBlock Text="{Binding EditorLayerSummary}"
+                                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                       TextWrapping="Wrap" />
+                                                            <TextBlock Text="{Binding ActiveEditorLayerSummary}"
+                                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                       TextWrapping="Wrap" />
+                                                            <StackPanel Orientation="Horizontal"
+                                                                        Spacing="8">
+                                                                <Button Content="Add"
+                                                                        Command="{Binding AddBlankEditorLayerCommand}" />
+                                                                <Button Content="Duplicate"
+                                                                        Command="{Binding DuplicateActiveEditorLayerCommand}" />
+                                                                <Button Content="Remove"
+                                                                        Command="{Binding RemoveActiveEditorLayerCommand}" />
+                                                            </StackPanel>
+                                                            <StackPanel Orientation="Horizontal"
+                                                                        Spacing="8">
+                                                                <Button Content="Flatten"
+                                                                        Command="{Binding FlattenVisibleLayersCommand}" />
+                                                                <Button Content="Flatten Copy"
+                                                                        Command="{Binding FlattenVisibleCopyToNewLayerCommand}" />
+                                                                <Button Content="Runtime Layer"
+                                                                        Command="{Binding AddRuntimeTemplateLayerCommand}" />
+                                                            </StackPanel>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </Expander>
+
+                                                <Expander Header="Review and Handoff"
+                                                          IsExpanded="False">
+                                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                                            BorderBrush="{DynamicResource BorderBrushDark}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="10"
+                                                            Padding="10">
+                                                        <StackPanel Spacing="8">
+                                                            <TextBlock Text="{Binding CurrentFrameReviewSummary}"
+                                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                       TextWrapping="Wrap" />
+                                                            <ComboBox ItemsSource="{Binding FrameReviewStatusOptions}"
+                                                                      SelectedItem="{Binding SelectedFrameReviewStatus}" />
+                                                            <TextBox Text="{Binding SelectedFrameReviewNote}"
+                                                                     AcceptsReturn="True"
+                                                                     TextWrapping="Wrap"
+                                                                     MinHeight="60"
+                                                                     Watermark="Describe what needs work on this frame..." />
+                                                            <TextBox Text="{Binding SelectedFrameIssueTagsText}"
+                                                                     AcceptsReturn="True"
+                                                                     TextWrapping="Wrap"
+                                                                     MinHeight="44"
+                                                                     Watermark="off_model, broken_outline, placeholder" />
+                                                            <StackPanel Orientation="Horizontal"
+                                                                        Spacing="8">
+                                                                <Button Content="Save Review"
+                                                                        Command="{Binding SaveCurrentFrameReviewCommand}" />
+                                                                <Button Content="Stage Canvas"
+                                                                        Command="{Binding StageEditorCanvasCandidateCommand}" />
+                                                                <Button Content="Request"
+                                                                        Command="{Binding CreateRequestFromCurrentFrameCommand}" />
+                                                            </StackPanel>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </Expander>
+                                            </StackPanel>
+                                        </ScrollViewer>
+                                    </Border>
+                                    <Border Grid.Column="1"
+                                            Background="{DynamicResource SurfaceBrush}"
+                                            BorderBrush="{DynamicResource BorderBrushDark}"
+                                            BorderThickness="1"
+                                            CornerRadius="12"
+                                            Padding="12">
+                                        <Grid RowDefinitions="Auto,*">
+                                            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto"
+                                                  ColumnSpacing="8">
+                                                <StackPanel Spacing="3">
+                                                    <TextBlock Text="Canvas"
+                                                               FontSize="16"
+                                                               FontWeight="Bold" />
+                                                    <TextBlock Text="{Binding EditorStatusMessage}"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1"
+                                                        Content="Prev Ref"
+                                                        Command="{Binding AddPreviousFrameReferenceLayerCommand}" />
+                                                <Button Grid.Column="2"
+                                                        Content="Next Ref"
+                                                        Command="{Binding AddNextFrameReferenceLayerCommand}" />
+                                                <Button Grid.Column="3"
+                                                        Content="Blank"
+                                                        Command="{Binding CreateBlankCurrentFrameCommand}" />
+                                                <Button Grid.Column="4"
+                                                        Content="Capture"
+                                                        Command="{Binding CaptureEditorReviewBundleCommand}" />
+                                            </Grid>
+
+                                            <Grid Grid.Row="1"
+                                                  Margin="0,12,0,0">
+                                                <Border IsVisible="{Binding IsEditorFrameMissing}"
+                                                        Background="{DynamicResource SurfaceAltBrush}"
+                                                        BorderBrush="{DynamicResource BorderBrushDark}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="12"
+                                                        Padding="20">
+                                                    <StackPanel Spacing="12"
+                                                                VerticalAlignment="Center">
+                                                        <TextBlock Text="Editor Not Ready"
+                                                                   FontSize="18"
+                                                                   FontWeight="Bold" />
+                                                        <TextBlock Text="{Binding EditorEmptyStateSummary}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   TextWrapping="Wrap" />
+                                                        <StackPanel Orientation="Horizontal"
+                                                                    Spacing="8">
+                                                            <Button Content="Load Current"
+                                                                    Command="{Binding LoadCurrentFrameIntoEditorCommand}" />
+                                                            <Button Content="Create Blank"
+                                                                    Command="{Binding CreateBlankCurrentFrameCommand}" />
+                                                            <Button Content="Load Template"
+                                                                    Command="{Binding LoadRuntimeFrameIntoEditorCommand}" />
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <ScrollViewer IsVisible="{Binding IsEditorFrameLoaded}"
+                                                              HorizontalScrollBarVisibility="Auto"
+                                                              VerticalScrollBarVisibility="Auto">
+                                                    <Grid Width="{Binding EditorCanvasWidth}"
+                                                          Height="{Binding EditorCanvasHeight}">
+                                                        <ItemsControl ItemsSource="{Binding EditorPixels}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <WrapPanel Orientation="Horizontal" />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate x:DataType="vm:EditorPixelItemViewModel">
+                                                                    <Border Width="{Binding #Root.DataContext.EditorPixelSize}"
+                                                                            Height="{Binding #Root.DataContext.EditorPixelSize}"
+                                                                            Margin="0"
+                                                                            Padding="0"
+                                                                            Background="{Binding Brush}"
+                                                                            BorderBrush="{Binding BorderBrush}"
+                                                                            BorderThickness="{Binding BorderThickness}"
+                                                                            Tag="{Binding .}"
+                                                                            ToolTip.Tip="{Binding Label}"
+                                                                            PointerPressed="OnEditorPixelPointerPressed"
+                                                                            PointerEntered="OnEditorPixelPointerEntered"
+                                                                            PointerReleased="OnEditorPixelPointerReleased" />
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+
+                                                        <Canvas IsVisible="{Binding HasEditorSelectionOverlay}"
+                                                                ClipToBounds="False">
+                                                            <Border Canvas.Left="{Binding EditorSelectionOverlayLeft}"
+                                                                    Canvas.Top="{Binding EditorSelectionOverlayTop}"
+                                                                    Width="{Binding EditorSelectionOverlayWidth}"
+                                                                    Height="{Binding EditorSelectionOverlayHeight}"
+                                                                    BorderBrush="#ECA72C"
+                                                                    BorderThickness="2"
+                                                                    CornerRadius="2"
+                                                                    Background="#20ECA72C"
+                                                                    IsHitTestVisible="False" />
+                                                            <Border Canvas.Left="{Binding EditorSelectionToolbarLeft}"
+                                                                    Canvas.Top="{Binding EditorSelectionToolbarTop}"
+                                                                    Background="#DD18212C"
+                                                                    BorderBrush="{DynamicResource BorderBrushDark}"
+                                                                    BorderThickness="1"
+                                                                    CornerRadius="8"
+                                                                    Padding="6,4">
+                                                                <StackPanel Orientation="Horizontal"
+                                                                            Spacing="4">
+                                                                    <Button Content="Rot L"
+                                                                            Height="26"
+                                                                            Padding="8,0"
+                                                                            Command="{Binding RotateSelectionLeftCommand}" />
+                                                                    <Button Content="Rot R"
+                                                                            Height="26"
+                                                                            Padding="8,0"
+                                                                            Command="{Binding RotateSelectionRightCommand}" />
+                                                                    <Button Content="+"
+                                                                            Width="28"
+                                                                            Height="26"
+                                                                            Padding="0"
+                                                                            Command="{Binding ScaleSelectionUpCommand}" />
+                                                                    <Button Content="-"
+                                                                            Width="28"
+                                                                            Height="26"
+                                                                            Padding="0"
+                                                                            Command="{Binding ScaleSelectionDownCommand}" />
+                                                                    <Button Content="Copy"
+                                                                            Height="26"
+                                                                            Padding="8,0"
+                                                                            Command="{Binding CopySelectionToNewLayerCommand}" />
+                                                                    <Button Content="Lift"
+                                                                            Height="26"
+                                                                            Padding="8,0"
+                                                                            Command="{Binding LiftSelectionToNewLayerCommand}" />
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </Canvas>
+                                                    </Grid>
+                                                </ScrollViewer>
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border Grid.Column="2"
+                                            Background="{DynamicResource SurfaceBrush}"
+                                            BorderBrush="{DynamicResource BorderBrushDark}"
+                                            BorderThickness="1"
+                                            CornerRadius="12"
+                                            Padding="12">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                            <StackPanel Spacing="12">
+                                                <Border Background="{DynamicResource SurfaceAltBrush}"
+                                                        BorderBrush="{DynamicResource BorderBrushDark}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="10"
+                                                        Padding="10">
+                                                    <StackPanel Spacing="6">
+                                                        <TextBlock Text="References"
+                                                                   FontWeight="Bold" />
+                                                        <TextBlock Text="{Binding PaintMonitorSummary}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding EditorComparisonSummary}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <Grid ColumnDefinitions="*,*"
+                                                      ColumnSpacing="10">
+                                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                                            BorderBrush="{DynamicResource BorderBrushDark}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="10"
+                                                            Padding="10">
+                                                        <StackPanel Spacing="6"
+                                                                    HorizontalAlignment="Center">
+                                                            <TextBlock Text="Target"
+                                                                       FontWeight="Bold" />
+                                                            <Grid Width="132"
+                                                                  Height="132">
+                                                                <Image Source="{Binding CurrentFrameBitmap}"
+                                                                       Width="132"
+                                                                       Height="132"
+                                                                       Stretch="Uniform"
+                                                                       IsVisible="{Binding HasCurrentFrameBitmap}" />
+                                                                <TextBlock Text="No target"
+                                                                           IsVisible="{Binding IsCurrentFrameBitmapMissing}"
+                                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center" />
+                                                            </Grid>
+                                                        </StackPanel>
+                                                    </Border>
+                                                    <Border Grid.Column="1"
+                                                            Background="{DynamicResource SurfaceAltBrush}"
+                                                            BorderBrush="{DynamicResource BorderBrushDark}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="10"
+                                                            Padding="10">
+                                                        <StackPanel Spacing="6"
+                                                                    HorizontalAlignment="Center">
+                                                            <TextBlock Text="Runtime"
+                                                                       FontWeight="Bold" />
+                                                            <Grid Width="132"
+                                                                  Height="132">
+                                                                <Image Source="{Binding RuntimeFrameBitmap}"
+                                                                       Width="132"
+                                                                       Height="132"
+                                                                       Stretch="Uniform"
+                                                                       IsVisible="{Binding HasRuntimeFrameBitmap}" />
+                                                                <TextBlock Text="No runtime"
+                                                                           IsVisible="{Binding IsRuntimeFrameBitmapMissing}"
+                                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center" />
+                                                            </Grid>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </Grid>
+
+                                                <Grid ColumnDefinitions="*,*"
+                                                      ColumnSpacing="10">
+                                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                                            BorderBrush="{DynamicResource BorderBrushDark}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="10"
+                                                            Padding="10">
+                                                        <StackPanel Spacing="6"
+                                                                    HorizontalAlignment="Center">
+                                                            <TextBlock Text="Blink"
+                                                                       FontWeight="Bold" />
+                                                            <ToggleSwitch IsChecked="{Binding IsEditorBlinkCompareEnabled}"
+                                                                          OnContent="On"
+                                                                          OffContent="Off" />
+                                                            <Grid Width="132"
+                                                                  Height="132">
+                                                                <Image Source="{Binding EditorBlinkCompareBitmap}"
+                                                                       Width="132"
+                                                                       Height="132"
+                                                                       Stretch="Uniform"
+                                                                       IsVisible="{Binding IsEditorFrameLoaded}" />
+                                                                <TextBlock Text="Load frame"
+                                                                           IsVisible="{Binding IsEditorFrameMissing}"
+                                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center" />
+                                                            </Grid>
+                                                        </StackPanel>
+                                                    </Border>
+                                                    <Border Grid.Column="1"
+                                                            Background="{DynamicResource SurfaceAltBrush}"
+                                                            BorderBrush="{DynamicResource BorderBrushDark}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="10"
+                                                            Padding="10">
+                                                        <StackPanel Spacing="6"
+                                                                    HorizontalAlignment="Center">
+                                                            <TextBlock Text="Diff"
+                                                                       FontWeight="Bold" />
+                                                            <Grid Width="132"
+                                                                  Height="132">
+                                                                <Image Source="{Binding EditorDiffBitmap}"
+                                                                       Width="132"
+                                                                       Height="132"
+                                                                       Stretch="Uniform"
+                                                                       IsVisible="{Binding HasEditorDiffBitmap}" />
+                                                                <TextBlock Text="No diff"
+                                                                           IsVisible="{Binding IsEditorDiffBitmapMissing}"
+                                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center" />
+                                                            </Grid>
+                                                            <TextBlock Text="{Binding LiveDiffSummary}"
+                                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                       TextAlignment="Center"
+                                                                       TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                </Grid>
+                                            </StackPanel>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                                <Border Grid.Row="3"
+                                        Background="{DynamicResource SurfaceAltBrush}"
+                                        BorderBrush="{DynamicResource BorderBrushDark}"
+                                        BorderThickness="1"
+                                        CornerRadius="12"
+                                        Padding="12">
+                                    <Grid ColumnDefinitions="280,280,*"
+                                          ColumnSpacing="12">
+                                        <StackPanel Spacing="8">
+                                            <Grid ColumnDefinitions="*,Auto,Auto,Auto"
+                                                  ColumnSpacing="8">
+                                                <TextBlock Text="Playback"
+                                                           FontWeight="Bold"
+                                                           VerticalAlignment="Center" />
+                                                <Button Grid.Column="1"
+                                                        Content="Play"
+                                                        Command="{Binding PlayPreviewCommand}" />
+                                                <Button Grid.Column="2"
+                                                        Content="Pause"
+                                                        Command="{Binding PausePreviewCommand}" />
+                                                <Button Grid.Column="3"
+                                                        Content="Use Live"
+                                                        Command="{Binding UsePlaybackFrameAsEditTargetCommand}" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="*,*"
+                                                  ColumnSpacing="10">
+                                                <StackPanel Spacing="4"
+                                                            HorizontalAlignment="Center">
+                                                    <TextBlock Text="Authored"
+                                                               FontWeight="Bold" />
+                                                    <Grid Width="96"
+                                                          Height="96">
+                                                        <Image Source="{Binding PlaybackFrameBitmap}"
+                                                               Width="96"
+                                                               Height="96"
+                                                               Stretch="Uniform"
+                                                               IsVisible="{Binding HasPlaybackFrameBitmap}" />
+                                                    </Grid>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1"
+                                                            Spacing="4"
+                                                            HorizontalAlignment="Center">
+                                                    <TextBlock Text="Runtime"
+                                                               FontWeight="Bold" />
+                                                    <Grid Width="96"
+                                                          Height="96">
+                                                        <Image Source="{Binding RuntimePlaybackFrameBitmap}"
+                                                               Width="96"
+                                                               Height="96"
+                                                               Stretch="Uniform"
+                                                               IsVisible="{Binding HasRuntimePlaybackFrameBitmap}" />
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Grid>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="1"
+                                                    Spacing="8">
+                                            <TextBlock Text="Neighbors"
+                                                       FontWeight="Bold" />
+                                            <Grid ColumnDefinitions="*,*"
+                                                  ColumnSpacing="10">
+                                                <StackPanel Spacing="4"
+                                                            HorizontalAlignment="Center">
+                                                    <TextBlock Text="Previous"
+                                                               FontWeight="Bold" />
+                                                    <Grid Width="96"
+                                                          Height="96">
+                                                        <Image Source="{Binding PreviousFrameReferenceBitmap}"
+                                                               Width="96"
+                                                               Height="96"
+                                                               Stretch="Uniform"
+                                                               IsVisible="{Binding HasPreviousFrameReferenceBitmap}" />
+                                                    </Grid>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1"
+                                                            Spacing="4"
+                                                            HorizontalAlignment="Center">
+                                                    <TextBlock Text="Next"
+                                                               FontWeight="Bold" />
+                                                    <Grid Width="96"
+                                                          Height="96">
+                                                        <Image Source="{Binding NextFrameReferenceBitmap}"
+                                                               Width="96"
+                                                               Height="96"
+                                                               Stretch="Uniform"
+                                                               IsVisible="{Binding HasNextFrameReferenceBitmap}" />
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Grid>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2"
+                                                    Spacing="8">
+                                            <Grid ColumnDefinitions="*,Auto"
+                                                  ColumnSpacing="8">
+                                                <TextBlock Text="Frame Navigation"
+                                                           FontWeight="Bold"
+                                                           VerticalAlignment="Center" />
+                                                <Border Grid.Column="1"
+                                                        Background="{DynamicResource AccentPillBrush}"
+                                                        CornerRadius="999"
+                                                        Padding="10,4">
+                                                    <TextBlock Text="{Binding ViewerSelectionSummary}"
+                                                               FontWeight="Bold" />
+                                                </Border>
+                                            </Grid>
+                                            <Grid ColumnDefinitions="*,*,*,*,*,*"
+                                                  ColumnSpacing="8">
+                                                <Button Content="Prev"
+                                                        Command="{Binding StepPreviousFrameCommand}" />
+                                                <Button Grid.Column="1"
+                                                        Content="Next"
+                                                        Command="{Binding StepNextFrameCommand}" />
+                                                <Button Grid.Column="2"
+                                                        Content="Restart"
+                                                        Command="{Binding RestartPreviewCommand}" />
+                                                <Button Grid.Column="3"
+                                                        Content="Edit Current"
+                                                        Command="{Binding LoadCurrentFrameIntoEditorCommand}" />
+                                                <Button Grid.Column="4"
+                                                        Content="Edit Prev"
+                                                        Command="{Binding EditPreviousFrameCommand}" />
+                                                <Button Grid.Column="5"
+                                                        Content="Edit Next"
+                                                        Command="{Binding EditNextFrameCommand}" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="*,*"
+                                                  ColumnSpacing="8">
+                                                <Button Content="Use Prev -> Current"
+                                                        Command="{Binding CopyPreviousFrameIntoCurrentCommand}" />
+                                                <Button Grid.Column="1"
+                                                        Content="Duplicate Current -> Next"
+                                                        Command="{Binding DuplicateCurrentFrameToNextCommand}" />
+                                            </Grid>
+                                            <Border Background="{DynamicResource SurfaceBrush}"
+                                                    BorderBrush="{DynamicResource BorderBrushDark}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="10"
+                                                    Padding="8">
+                                                <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                                              VerticalScrollBarVisibility="Disabled">
+                                                    <ItemsControl ItemsSource="{Binding ViewerFrames}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <StackPanel Orientation="Horizontal" />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="vm:ViewerFrameItemViewModel">
+                                                                <Border Width="92"
+                                                                        Margin="0,0,8,0"
+                                                                        Padding="6"
+                                                                        Background="{DynamicResource SurfaceAltBrush}"
+                                                                        BorderBrush="{Binding FrameBorderBrush}"
+                                                                        BorderThickness="{Binding FrameBorderThickness}"
+                                                                        CornerRadius="8">
+                                                                    <StackPanel Spacing="4">
+                                                                        <TextBlock Text="{Binding FrameId}"
+                                                                                   FontWeight="Bold"
+                                                                                   HorizontalAlignment="Center" />
+                                                                        <Border Background="{DynamicResource SurfaceBrush}"
+                                                                                BorderBrush="{DynamicResource BorderBrushDark}"
+                                                                                BorderThickness="1"
+                                                                                CornerRadius="6"
+                                                                                Width="64"
+                                                                                Height="64"
+                                                                                HorizontalAlignment="Center">
+                                                                            <Grid>
+                                                                                <Image Source="{Binding ThumbnailBitmap}"
+                                                                                       Stretch="Uniform"
+                                                                                       IsVisible="{Binding HasThumbnailBitmap}" />
+                                                                                <TextBlock Text="{Binding ThumbnailLabel}"
+                                                                                           IsVisible="{Binding IsThumbnailMissing}"
+                                                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                                           HorizontalAlignment="Center"
+                                                                                           VerticalAlignment="Center"
+                                                                                           TextAlignment="Center"
+                                                                                           FontSize="9" />
+                                                                            </Grid>
+                                                                        </Border>
+                                                                        <Button Content="Show"
+                                                                                Command="{Binding #Root.DataContext.SelectViewerFrameCommand}"
+                                                                                CommandParameter="{Binding FrameIndex}" />
+                                                                    </StackPanel>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </ScrollViewer>
+                                            </Border>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Paint Legacy">
                             <StackPanel Spacing="12">
                         <TextBlock Text="Paint shortcuts: M select  |  A lasso  |  G move  |  B brush  |  E erase  |  I dropper  |  F fill  |  L line  |  R rectangle  |  O ellipse  |  H mirror horizontal  |  V mirror vertical  |  Alt+Arrows move selection  |  Ctrl+C copy  |  Ctrl+V paste  |  Ctrl+Shift+H flip selection H  |  Ctrl+Shift+V flip selection V  |  Delete clear selection"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
@@ -2410,6 +3533,36 @@
                                     Content="Back To Animate"
                                     Command="{Binding OpenAnimateWorkspaceCommand}" />
                         </Grid>
+                        <Border Background="{DynamicResource AccentPillBrush}"
+                                CornerRadius="12"
+                                Padding="12">
+                            <Grid ColumnDefinitions="*,Auto,Auto"
+                                  ColumnSpacing="12">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="{Binding PaintEditTargetTitle}"
+                                               FontSize="16"
+                                               FontWeight="Bold"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding PaintEditTargetSummary}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding PaintEditStateSummary}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding PaintNextStepSummary}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button Grid.Column="1"
+                                        Content="Save + Replay"
+                                        Command="{Binding SaveAndReturnToAnimateCommand}"
+                                        VerticalAlignment="Center" />
+                                <Button Grid.Column="2"
+                                        Content="Back To Animate"
+                                        Command="{Binding OpenAnimateWorkspaceCommand}"
+                                        VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
                         <Border Background="{DynamicResource AccentAuditBrush}"
                                 CornerRadius="12"
                                 Padding="12">
@@ -2978,6 +4131,9 @@
                                                 </Grid>
                                                 <TextBlock Text="{Binding EditorHsvSummary}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}" />
+                                                <TextBlock Text="{Binding EditorQuickColorSummary}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           TextWrapping="Wrap" />
                                                 <Grid ColumnDefinitions="Auto,*,Auto"
                                                       ColumnSpacing="8">
                                                     <TextBlock Text="H"
@@ -3014,6 +4170,58 @@
                                                                Text="{Binding EditorValue}"
                                                                VerticalAlignment="Center" />
                                                 </Grid>
+                                                <TextBlock Text="Quick Hue Ring"
+                                                           FontWeight="Bold" />
+                                                <ItemsControl ItemsSource="{Binding EditorHuePresets}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <WrapPanel Orientation="Horizontal" />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:ColorPresetItemViewModel">
+                                                            <StackPanel Spacing="4"
+                                                                        Margin="0,0,8,8">
+                                                                <Button Width="28"
+                                                                        Height="28"
+                                                                        Background="{Binding Brush}"
+                                                                        BorderBrush="#4F463A"
+                                                                        BorderThickness="1"
+                                                                        Command="{Binding #Root.DataContext.UseQuickColorPresetCommand}"
+                                                                        CommandParameter="{Binding .}" />
+                                                                <TextBlock Text="{Binding Label}"
+                                                                           FontSize="10"
+                                                                           HorizontalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <TextBlock Text="Current Hue Tone Ramp"
+                                                           FontWeight="Bold" />
+                                                <ItemsControl ItemsSource="{Binding EditorTonePresets}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <WrapPanel Orientation="Horizontal" />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:ColorPresetItemViewModel">
+                                                            <StackPanel Spacing="4"
+                                                                        Margin="0,0,8,8">
+                                                                <Button Width="32"
+                                                                        Height="32"
+                                                                        Background="{Binding Brush}"
+                                                                        BorderBrush="#4F463A"
+                                                                        BorderThickness="1"
+                                                                        Command="{Binding #Root.DataContext.UseQuickColorPresetCommand}"
+                                                                        CommandParameter="{Binding .}" />
+                                                                <TextBlock Text="{Binding Label}"
+                                                                           FontSize="10"
+                                                                           HorizontalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
                                             </StackPanel>
 
                                             <StackPanel Spacing="6">
@@ -3118,16 +4326,28 @@
                                                         <TextBlock Text="{Binding SelectedProjectPaletteSummary}"
                                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                                    TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding ProjectPaletteSaveHint}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   TextWrapping="Wrap" />
                                                         <TextBlock Text="{Binding ProjectPaletteMessage}"
                                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                                    TextWrapping="Wrap" />
-                                                        <StackPanel Orientation="Horizontal"
-                                                                    Spacing="8">
+                                                        <Grid ColumnDefinitions="*,*"
+                                                              ColumnSpacing="8">
                                                             <Button Content="Load Into Swatches"
                                                                     Command="{Binding ApplySelectedProjectPaletteCommand}" />
-                                                            <Button Content="Delete Palette"
+                                                            <Button Grid.Column="1"
+                                                                    Content="Delete Palette"
                                                                     Command="{Binding DeleteSelectedProjectPaletteCommand}" />
-                                                        </StackPanel>
+                                                        </Grid>
+                                                        <Grid ColumnDefinitions="*,*"
+                                                              ColumnSpacing="8">
+                                                            <Button Content="Save Species Palette"
+                                                                    Command="{Binding SaveSavedSwatchesAsSpeciesPaletteCommand}" />
+                                                            <Button Grid.Column="1"
+                                                                    Content="Save Project Palette"
+                                                                    Command="{Binding SaveSavedSwatchesAsProjectPaletteCommand}" />
+                                                        </Grid>
                                                         <ListBox ItemsSource="{Binding ProjectPalettes}"
                                                                  SelectedItem="{Binding SelectedProjectPaletteItem}"
                                                                  BorderThickness="0"
@@ -3145,6 +4365,14 @@
                                                                             <TextBlock Text="{Binding Name}"
                                                                                        FontWeight="Bold"
                                                                                        TextWrapping="Wrap" />
+                                                                            <Border Background="{DynamicResource AccentPillBrush}"
+                                                                                    CornerRadius="999"
+                                                                                    Padding="8,3"
+                                                                                    HorizontalAlignment="Left">
+                                                                                <TextBlock Text="{Binding ScopeLabel}"
+                                                                                           FontSize="11"
+                                                                                           FontWeight="Bold" />
+                                                                            </Border>
                                                                             <TextBlock Text="{Binding ColorSummary}"
                                                                                        Foreground="{DynamicResource TextSecondaryBrush}" />
                                                                             <TextBlock Text="{Binding PreviewSummary}"
@@ -3181,27 +4409,30 @@
                                                             Content="Duplicate"
                                                             Command="{Binding DuplicateActiveEditorLayerCommand}" />
                                                     <Button Grid.Column="2"
+                                                            Content="Copy To Layer"
+                                                            Command="{Binding CopySelectionToNewLayerCommand}" />
+                                                    <Button Grid.Column="3"
                                                             Content="Lift Selection"
                                                             Command="{Binding LiftSelectionToNewLayerCommand}" />
-                                                    <Button Grid.Column="3"
-                                                            Content="Remove"
-                                                            Command="{Binding RemoveActiveEditorLayerCommand}" />
                                                 </Grid>
                                                 <Grid ColumnDefinitions="*,*,*,*,*"
                                                       ColumnSpacing="8">
-                                                    <Button Content="Lock Others"
-                                                            Command="{Binding LockAllButActiveEditorLayerCommand}" />
+                                                    <Button Content="Remove"
+                                                            Command="{Binding RemoveActiveEditorLayerCommand}" />
                                                     <Button Grid.Column="1"
+                                                            Content="Lock Others"
+                                                            Command="{Binding LockAllButActiveEditorLayerCommand}" />
+                                                    <Button Grid.Column="2"
                                                             Content="Unlock All"
                                                             Command="{Binding UnlockAllEditorLayersCommand}" />
-                                                    <Button Grid.Column="2"
+                                                    <Button Grid.Column="3"
                                                             Content="Solo Active"
                                                             Command="{Binding SoloActiveEditorLayerCommand}" />
-                                                    <Button Grid.Column="3"
+                                                    <Button Grid.Column="4"
                                                             Content="Show All"
                                                             Command="{Binding ShowAllEditorLayersCommand}" />
                                                 </Grid>
-                                                <Grid ColumnDefinitions="*,*,*,*"
+                                                <Grid ColumnDefinitions="*,*,*,*,*"
                                                       ColumnSpacing="8">
                                                     <Button Content="Runtime Template"
                                                             Command="{Binding AddRuntimeTemplateLayerCommand}" />
@@ -3214,6 +4445,9 @@
                                                     <Button Grid.Column="3"
                                                             Content="Flatten Visible"
                                                             Command="{Binding FlattenVisibleLayersCommand}" />
+                                                    <Button Grid.Column="4"
+                                                            Content="Flatten Copy"
+                                                            Command="{Binding FlattenVisibleCopyToNewLayerCommand}" />
                                                 </Grid>
                                                 <ItemsControl ItemsSource="{Binding EditorLayers}">
                                                     <ItemsControl.ItemTemplate>
@@ -3308,6 +4542,12 @@
                                             <StackPanel Spacing="6">
                                                 <TextBlock Text="Selection"
                                                            FontWeight="Bold" />
+                                                <TextBlock Text="{Binding EditorSelectionBoundsSummary}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding EditorSelectionTransformHint}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           TextWrapping="Wrap" />
                                                 <Grid ColumnDefinitions="*,*"
                                                       ColumnSpacing="8">
                                                     <Button Content="Select All"
@@ -3407,7 +4647,8 @@
                                             <ScrollViewer IsVisible="{Binding IsEditorFrameLoaded}"
                                                           HorizontalScrollBarVisibility="Auto"
                                                           VerticalScrollBarVisibility="Auto">
-                                                <Border Width="{Binding EditorCanvasWidth}">
+                                                <Grid Width="{Binding EditorCanvasWidth}"
+                                                      Height="{Binding EditorCanvasHeight}">
                                                     <ItemsControl ItemsSource="{Binding EditorPixels}">
                                                         <ItemsControl.ItemsPanel>
                                                             <ItemsPanelTemplate>
@@ -3431,7 +4672,138 @@
                                                             </DataTemplate>
                                                         </ItemsControl.ItemTemplate>
                                                     </ItemsControl>
-                                                </Border>
+
+                                                    <Canvas IsVisible="{Binding HasEditorSelectionOverlay}"
+                                                            ClipToBounds="False">
+                                                        <Border Canvas.Left="{Binding EditorSelectionOverlayLeft}"
+                                                                Canvas.Top="{Binding EditorSelectionOverlayTop}"
+                                                                Width="{Binding EditorSelectionOverlayWidth}"
+                                                                Height="{Binding EditorSelectionOverlayHeight}"
+                                                                BorderBrush="#ECA72C"
+                                                                BorderThickness="2"
+                                                                CornerRadius="2"
+                                                                Background="#20ECA72C"
+                                                                IsHitTestVisible="False" />
+                                                        <Border Canvas.Left="{Binding EditorSelectionToolbarLeft}"
+                                                                Canvas.Top="{Binding EditorSelectionToolbarTop}"
+                                                                Background="#DD18212C"
+                                                                BorderBrush="{DynamicResource BorderBrushDark}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="8"
+                                                                Padding="6,4">
+                                                            <StackPanel Orientation="Horizontal"
+                                                                        Spacing="4">
+                                                                <Button Content="⟲"
+                                                                        Width="32"
+                                                                        Height="26"
+                                                                        Padding="0"
+                                                                        ToolTip.Tip="Rotate selection left"
+                                                                        Command="{Binding RotateSelectionLeftCommand}" />
+                                                                <Button Content="⟳"
+                                                                        Width="32"
+                                                                        Height="26"
+                                                                        Padding="0"
+                                                                        ToolTip.Tip="Rotate selection right"
+                                                                        Command="{Binding RotateSelectionRightCommand}" />
+                                                                <Button Content="+"
+                                                                        Width="28"
+                                                                        Height="26"
+                                                                        Padding="0"
+                                                                        ToolTip.Tip="Scale selection up"
+                                                                        Command="{Binding ScaleSelectionUpCommand}" />
+                                                                <Button Content="-"
+                                                                        Width="28"
+                                                                        Height="26"
+                                                                        Padding="0"
+                                                                        ToolTip.Tip="Scale selection down"
+                                                                        Command="{Binding ScaleSelectionDownCommand}" />
+                                                                <Button Content="Copy"
+                                                                        Height="26"
+                                                                        Padding="8,0"
+                                                                        ToolTip.Tip="Copy selection into a new layer"
+                                                                        Command="{Binding CopySelectionToNewLayerCommand}" />
+                                                                <Button Content="Lift"
+                                                                        Height="26"
+                                                                        Padding="8,0"
+                                                                        ToolTip.Tip="Lift selection into a new layer"
+                                                                        Command="{Binding LiftSelectionToNewLayerCommand}" />
+                                                            </StackPanel>
+                                                        </Border>
+
+                                                        <Button Canvas.Left="{Binding EditorSelectionHandleWestLeft}"
+                                                                Canvas.Top="{Binding EditorSelectionHandleCenterY}"
+                                                                Width="16"
+                                                                Height="16"
+                                                                Padding="0"
+                                                                Content="◀"
+                                                                FontSize="10"
+                                                                Command="{Binding ResizeSelectionFromHandleCommand}"
+                                                                CommandParameter="W" />
+                                                        <Button Canvas.Left="{Binding EditorSelectionHandleEastLeft}"
+                                                                Canvas.Top="{Binding EditorSelectionHandleCenterY}"
+                                                                Width="16"
+                                                                Height="16"
+                                                                Padding="0"
+                                                                Content="▶"
+                                                                FontSize="10"
+                                                                Command="{Binding ResizeSelectionFromHandleCommand}"
+                                                                CommandParameter="E" />
+                                                        <Button Canvas.Left="{Binding EditorSelectionHandleCenterX}"
+                                                                Canvas.Top="{Binding EditorSelectionHandleNorthTop}"
+                                                                Width="16"
+                                                                Height="16"
+                                                                Padding="0"
+                                                                Content="▲"
+                                                                FontSize="10"
+                                                                Command="{Binding ResizeSelectionFromHandleCommand}"
+                                                                CommandParameter="N" />
+                                                        <Button Canvas.Left="{Binding EditorSelectionHandleCenterX}"
+                                                                Canvas.Top="{Binding EditorSelectionHandleSouthTop}"
+                                                                Width="16"
+                                                                Height="16"
+                                                                Padding="0"
+                                                                Content="▼"
+                                                                FontSize="10"
+                                                                Command="{Binding ResizeSelectionFromHandleCommand}"
+                                                                CommandParameter="S" />
+                                                        <Button Canvas.Left="{Binding EditorSelectionHandleWestLeft}"
+                                                                Canvas.Top="{Binding EditorSelectionHandleNorthTop}"
+                                                                Width="16"
+                                                                Height="16"
+                                                                Padding="0"
+                                                                Content="◤"
+                                                                FontSize="10"
+                                                                Command="{Binding ResizeSelectionFromHandleCommand}"
+                                                                CommandParameter="NW" />
+                                                        <Button Canvas.Left="{Binding EditorSelectionHandleEastLeft}"
+                                                                Canvas.Top="{Binding EditorSelectionHandleNorthTop}"
+                                                                Width="16"
+                                                                Height="16"
+                                                                Padding="0"
+                                                                Content="◥"
+                                                                FontSize="10"
+                                                                Command="{Binding ResizeSelectionFromHandleCommand}"
+                                                                CommandParameter="NE" />
+                                                        <Button Canvas.Left="{Binding EditorSelectionHandleWestLeft}"
+                                                                Canvas.Top="{Binding EditorSelectionHandleSouthTop}"
+                                                                Width="16"
+                                                                Height="16"
+                                                                Padding="0"
+                                                                Content="◣"
+                                                                FontSize="10"
+                                                                Command="{Binding ResizeSelectionFromHandleCommand}"
+                                                                CommandParameter="SW" />
+                                                        <Button Canvas.Left="{Binding EditorSelectionHandleEastLeft}"
+                                                                Canvas.Top="{Binding EditorSelectionHandleSouthTop}"
+                                                                Width="16"
+                                                                Height="16"
+                                                                Padding="0"
+                                                                Content="◢"
+                                                                FontSize="10"
+                                                                Command="{Binding ResizeSelectionFromHandleCommand}"
+                                                                CommandParameter="SE" />
+                                                    </Canvas>
+                                                </Grid>
                                             </ScrollViewer>
                                         </Grid>
                                     </Border>
@@ -3543,6 +4915,49 @@
                                                                    VerticalAlignment="Center" />
                                                     </Grid>
                                                     <TextBlock Text="The baseline is the frame as it looked when it was loaded or last saved."
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               TextAlignment="Center"
+                                                               TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Background="{DynamicResource SurfaceAltBrush}"
+                                                    BorderBrush="{DynamicResource BorderBrushDark}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="10"
+                                                    Padding="12">
+                                                <StackPanel Spacing="8"
+                                                            HorizontalAlignment="Center">
+                                                    <TextBlock Text="Blink Compare"
+                                                               FontWeight="Bold"
+                                                               HorizontalAlignment="Center" />
+                                                    <StackPanel Orientation="Horizontal"
+                                                                Spacing="8"
+                                                                HorizontalAlignment="Center">
+                                                        <ToggleSwitch IsChecked="{Binding IsEditorBlinkCompareEnabled}"
+                                                                      OnContent="On"
+                                                                      OffContent="Off" />
+                                                        <TextBlock Text="{Binding EditorBlinkCompareSummary}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   VerticalAlignment="Center"
+                                                                   TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <Grid Width="192"
+                                                          Height="192"
+                                                          HorizontalAlignment="Center">
+                                                        <Image Source="{Binding EditorBlinkCompareBitmap}"
+                                                               Width="192"
+                                                               Height="192"
+                                                               Stretch="Uniform"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               IsVisible="{Binding IsEditorFrameLoaded}" />
+                                                        <TextBlock Text="Load a frame"
+                                                                   IsVisible="{Binding IsEditorFrameMissing}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center" />
+                                                    </Grid>
+                                                    <TextBlock Text="Use this to catch subtle silhouette, shading, or cleanup regressions while you paint."
                                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                                TextAlignment="Center"
                                                                TextWrapping="Wrap" />
@@ -3740,6 +5155,99 @@
                                                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                                                        TextWrapping="Wrap" />
                                                         </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="{DynamicResource SurfaceAltBrush}"
+                                        BorderBrush="{DynamicResource BorderBrushDark}"
+                                        BorderThickness="1"
+                                        CornerRadius="12"
+                                        Padding="12">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="Discovery Categories"
+                                                   FontWeight="Bold" />
+                                        <TextBlock Text="{Binding PlanningDiscoveryCategorySummary}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   TextWrapping="Wrap" />
+                                        <ItemsControl ItemsSource="{Binding PlanningDiscoveryCategories}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:PlanningDiscoveryCategoryItemViewModel">
+                                                    <Border Background="{DynamicResource SurfaceBrush}"
+                                                            BorderBrush="{DynamicResource BorderBrushDark}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="10"
+                                                            Padding="10"
+                                                            Margin="0,0,0,8">
+                                                        <Grid ColumnDefinitions="*,Auto"
+                                                              ColumnSpacing="8">
+                                                            <StackPanel Spacing="4">
+                                                                <TextBlock Text="{Binding Category}"
+                                                                           FontWeight="Bold" />
+                                                                <TextBlock Text="{Binding Summary}"
+                                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                           TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                            <Border Grid.Column="1"
+                                                                    Background="{DynamicResource AccentPillBrush}"
+                                                                    CornerRadius="999"
+                                                                    Padding="10,4"
+                                                                    VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding CountLabel}"
+                                                                           FontWeight="Bold" />
+                                                            </Border>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="{DynamicResource SurfaceAltBrush}"
+                                        BorderBrush="{DynamicResource BorderBrushDark}"
+                                        BorderThickness="1"
+                                        CornerRadius="12"
+                                        Padding="12">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="Project Readiness"
+                                                   FontWeight="Bold" />
+                                        <TextBlock Text="This is the final release-minded checkpoint for blockers, trust state, validation, and portability."
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding ProjectReadinessSummary}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   TextWrapping="Wrap" />
+                                        <ItemsControl ItemsSource="{Binding ProjectReadinessItems}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:ProjectReadinessItemViewModel">
+                                                    <Border Background="{DynamicResource SurfaceBrush}"
+                                                            BorderBrush="{DynamicResource BorderBrushDark}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="10"
+                                                            Padding="10"
+                                                            Margin="0,0,0,8">
+                                                        <Grid ColumnDefinitions="*,Auto"
+                                                              ColumnSpacing="8">
+                                                            <StackPanel Spacing="4">
+                                                                <TextBlock Text="{Binding Title}"
+                                                                           FontWeight="Bold" />
+                                                                <TextBlock Text="{Binding Summary}"
+                                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                           TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                            <Border Grid.Column="1"
+                                                                    Background="{DynamicResource AccentAuditBrush}"
+                                                                    CornerRadius="999"
+                                                                    Padding="10,4"
+                                                                    VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding StatusLabel}"
+                                                                           FontWeight="Bold" />
+                                                            </Border>
+                                                        </Grid>
                                                     </Border>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
@@ -4319,8 +5827,7 @@
                     </Border>
                     </TabItem>
                 </TabControl>
-            </StackPanel>
-        </ScrollViewer>
+        </Grid>
     </Grid>
 
 </Window>

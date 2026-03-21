@@ -5,6 +5,8 @@ Updated: 2026-03-20
 Implementation backlog:
 
 - `PERFECT_LOOP_MILESTONE_BACKLOG.md`
+- `NEXT_WAVE_PLAN.md`
+- `RELEASE_CHECKLIST.md`
 
 ```text
 ╔══ Target Product ═══════════════════════════════════════════════════════╗
@@ -97,6 +99,28 @@ Success means a user can:
 ║ Phase 7  Export, Packaging, And Reuse                                  ║
 ╚═════════════════════════════════════════════════════════════════════════╝
 ```
+
+## Release Wave: Packaged Alpha
+
+This next wave is the last coordinated feature-and-polish pass before a formal packaged alpha.
+
+- `Release Hardening`
+  - single-instance behavior
+  - hidden workflow process behavior
+  - trusted export, validation, project kits, and validation sandboxes
+  - Windows and macOS packaging expectations
+- `Manual Art Deepening`
+  - stronger transform, selection, palette, layer, and compare workflow in Paint
+  - clearer Studio guidance for first-time creators
+- `AI Loop Deepening`
+  - provider-agnostic adapters
+  - visible request, attempt, candidate, and manual override state
+- `Cross-Project Validation`
+  - blank-project flow
+  - discovered/imported-project adoption
+  - reusable sample profiles and portability reports
+
+The goal for this wave is not a redesign. It is to harden the existing workspaces into a release-quality manual-first sprite workstation.
 
 ## Phase 1: Studio Core
 

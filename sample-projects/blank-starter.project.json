@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "project_id": "blank-starter",
+  "display_name": "Blank Starter Sample",
+  "root_path": "C:/SpriteWorkflow/SampleProjects/blank-starter",
+  "runtime_sprite_root": "sprites_runtime",
+  "authored_sprite_root": "sprites_authored",
+  "incoming_handoff_root": "incoming_handoffs",
+  "artifact_root": ".sprite-workflow/artifacts",
+  "review_data_path": ".sprite-workflow/reviews.json",
+  "request_data_path": ".sprite-workflow/requests.json",
+  "candidate_data_path": ".sprite-workflow/candidates.json",
+  "default_ai_provider_id": "manual-first",
+  "ai_providers": [
+    {
+      "provider_id": "manual-first",
+      "display_name": "Manual First",
+      "provider_kind": "manual_only",
+      "execution_mode": "manual_workspace",
+      "supports_automation": false,
+      "notes": "Use the app as a fully manual planning, painting, and review workstation before adding AI help."
+    },
+    {
+      "provider_id": "generic-browser-ai",
+      "display_name": "Generic Browser AI",
+      "provider_kind": "browser_chat",
+      "execution_mode": "manual_browser",
+      "supports_automation": false,
+      "notes": "Provider-agnostic browser handoff path for visible AI-assisted generation and repair."
+    }
+  ],
+  "variant_axes": {
+    "species": [ "hero", "enemy" ],
+    "age": [ "default" ],
+    "gender": [ "default" ],
+    "color": [ "base" ]
+  },
+  "families": {
+    "locomotion": [
+      { "sequence_id": "idle", "frame_count": 4 },
+      { "sequence_id": "walk", "frame_count": 6 }
+    ],
+    "expression": [
+      { "sequence_id": "happy", "frame_count": 4 },
+      { "sequence_id": "sad", "frame_count": 2 }
+    ]
+  },
+  "workflow_actions": [
+    {
+      "action_id": "refresh_coverage",
+      "display_name": "Refresh Coverage",
+      "description": "Recompute authored coverage and progress summaries from the starter project tree.",
+      "execution_mode": "hidden_process",
+      "command": "python",
+      "arguments": [ ".\\tools\\report_authored_sprite_coverage.py" ],
+      "working_directory": "C:/SpriteWorkflow/SampleProjects/blank-starter"
+    }
+  ]
+}

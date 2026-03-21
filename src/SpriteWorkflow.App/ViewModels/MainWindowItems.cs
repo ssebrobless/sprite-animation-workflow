@@ -39,6 +39,24 @@ public sealed record PlanningDiagnosticItemViewModel(
     string Title,
     string Summary);
 
+public sealed record PlanningDiscoveryCategoryItemViewModel(
+    string Category,
+    int Count,
+    string Summary)
+{
+    public string CountLabel => $"{Count}";
+}
+
+public sealed record ProjectReadinessItemViewModel(
+    string Title,
+    string Status,
+    string Summary)
+{
+    public string StatusLabel => string.IsNullOrWhiteSpace(Status)
+        ? "Unknown"
+        : string.Join(" ", Status.Replace('_', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
+}
+
 public sealed record FrameHistoryItemViewModel(
     string Label,
     string FilePath,
@@ -85,6 +103,17 @@ public sealed record ActivityLogItemViewModel(
     string Message)
 {
     public string TimestampLabel => Timestamp.ToLocalTime().ToString("h:mm:ss tt");
+}
+
+public sealed record LiveOperationStepItemViewModel(
+    string OperationId,
+    string Label,
+    string Status,
+    string Summary)
+{
+    public string StatusLabel => string.IsNullOrWhiteSpace(Status)
+        ? "Pending"
+        : string.Join(" ", Status.Replace('_', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
 }
 
 public sealed record RequestHistoryItemViewModel(
@@ -170,6 +199,7 @@ public sealed record RequestItemViewModel(
     string MustPreserve,
     string MustAvoid,
     string SourceNote,
+    string HealthSummary,
     IReadOnlyList<RequestHistoryItemViewModel> History,
     DateTimeOffset? UpdatedUtc)
 {
@@ -212,6 +242,33 @@ public sealed record AutomationTaskItemViewModel(
             : $"{PromptPreview[..217]}...";
     public string LatestActivitySummary => string.IsNullOrWhiteSpace(LatestActivity) ? "No automation activity recorded yet." : LatestActivity;
     public string LinkedCandidateSummary => LinkedCandidateCount == 0 ? "No linked candidates yet." : $"{LinkedCandidateCount} linked candidate(s)";
+
+    private static string FormatLabel(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var spaced = value.Replace('_', ' ');
+        return string.Join(" ", spaced.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
+    }
+}
+
+public sealed record AiProviderItemViewModel(
+    string ProviderId,
+    string DisplayName,
+    string ProviderKind,
+    string ExecutionMode,
+    bool SupportsAutomation,
+    string Notes,
+    bool IsDefault)
+{
+    public string KindLabel => FormatLabel(ProviderKind);
+    public string ExecutionModeLabel => FormatLabel(ExecutionMode);
+    public string AutomationLabel => SupportsAutomation ? "Automation-ready" : "Manual handoff";
+    public string DefaultLabel => IsDefault ? "Default provider" : "Optional provider";
+    public string Summary => string.IsNullOrWhiteSpace(Notes) ? $"{KindLabel} | {AutomationLabel}" : Notes;
 
     private static string FormatLabel(string value)
     {
@@ -516,7 +573,8 @@ public sealed class ViewerFrameItemViewModel : IDisposable
 
     public void Dispose()
     {
-        ThumbnailBitmap?.Dispose();
+        // Keep viewer thumbnails alive for the session so Avalonia doesn't measure
+        // an image source that was disposed mid-layout.
     }
 }
 
@@ -539,15 +597,37 @@ public sealed partial class EditorPaletteColorItemViewModel : ObservableObject
     partial void OnIsSelectedChanged(bool value) => OnPropertyChanged(nameof(SelectionLabel));
 }
 
+public sealed record ColorPresetItemViewModel(
+    string Label,
+    string HexColor,
+    IBrush Brush,
+    string Summary);
+
 public sealed record ProjectPaletteItemViewModel(
     string PaletteId,
     string Name,
+    string ScopeKind,
+    string ScopeKey,
     IReadOnlyList<string> Colors,
     DateTimeOffset? UpdatedUtc)
 {
     public string UpdatedLabel => UpdatedUtc is null ? "Not saved yet." : $"Updated {UpdatedUtc.Value.ToLocalTime():MMM d h:mm tt}";
     public string ColorSummary => Colors.Count == 0 ? "No colors" : $"{Colors.Count} colors";
     public string PreviewSummary => Colors.Count == 0 ? "Palette is empty." : string.Join(", ", Colors.Take(6)) + (Colors.Count > 6 ? " ..." : string.Empty);
+    public string ScopeLabel => ScopeKind.Equals("species", StringComparison.OrdinalIgnoreCase)
+        ? $"{FormatLabel(ScopeKey)} palette"
+        : "Project palette";
+
+    private static string FormatLabel(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "Project";
+        }
+
+        var spaced = value.Replace('_', ' ').Replace('-', ' ');
+        return string.Join(" ", spaced.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
+    }
 }
 
 public sealed record TrustedExportHistoryItemViewModel(

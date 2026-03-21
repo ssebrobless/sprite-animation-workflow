@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "project_id": "imported-external",
+  "display_name": "Imported External Sample",
+  "root_path": "C:/SpriteWorkflow/SampleProjects/imported-external",
+  "runtime_sprite_root": "Assets/Sprites/Runtime",
+  "authored_sprite_root": "Art/Sprites/Authored",
+  "incoming_handoff_root": "Art/Incoming/Handoffs",
+  "artifact_root": ".sprite-workflow/artifacts",
+  "review_data_path": ".sprite-workflow/reviews.json",
+  "request_data_path": ".sprite-workflow/requests.json",
+  "candidate_data_path": ".sprite-workflow/candidates.json",
+  "default_ai_provider_id": "generic-browser-ai",
+  "ai_providers": [
+    {
+      "provider_id": "generic-browser-ai",
+      "display_name": "Generic Browser AI",
+      "provider_kind": "browser_chat",
+      "execution_mode": "manual_browser",
+      "supports_automation": false,
+      "notes": "External imported projects can still use visible browser-driven AI requests without changing the core domain model."
+    },
+    {
+      "provider_id": "local-hidden-tools",
+      "display_name": "Local Hidden Workflow Tools",
+      "provider_kind": "local_process",
+      "execution_mode": "hidden_process",
+      "supports_automation": true,
+      "notes": "Use app-owned hidden processes for validation, exports, and local preprocessing."
+    }
+  ],
+  "variant_axes": {
+    "species": [ "mage", "slime", "bat" ],
+    "age": [ "default" ],
+    "gender": [ "default" ],
+    "color": [ "base", "alt" ]
+  },
+  "families": {
+    "locomotion": [
+      { "sequence_id": "idle", "frame_count": 4 },
+      { "sequence_id": "run", "frame_count": 8 }
+    ],
+    "combat": [
+      { "sequence_id": "cast", "frame_count": 6 },
+      { "sequence_id": "hit", "frame_count": 3 }
+    ]
+  },
+  "workflow_actions": [
+    {
+      "action_id": "run_validation",
+      "display_name": "Run Validation",
+      "description": "Generate a portability and asset-health report for the imported external sample project.",
+      "execution_mode": "hidden_process",
+      "command": "python",
+      "arguments": [ ".\\tools\\audit_sprite_contract.py" ],
+      "working_directory": "C:/SpriteWorkflow/SampleProjects/imported-external"
+    }
+  ]
+}

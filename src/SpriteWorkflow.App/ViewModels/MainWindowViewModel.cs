@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -45,6 +46,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     private readonly Dictionary<string, FrameReviewRecord> _frameReviewLookup = new(StringComparer.OrdinalIgnoreCase);
     private readonly DispatcherTimer _previewTimer = new();
     private readonly DispatcherTimer _compareBlinkTimer = new();
+    private readonly DispatcherTimer _editorBlinkTimer = new();
+    private readonly DispatcherTimer _liveOperationTimer = new();
     private readonly Action<ProjectReviewData>? _saveReviewData;
     private readonly Action<ProjectRequestData>? _saveRequestData;
     private readonly Action<ProjectCandidateData>? _saveCandidateData;
@@ -86,6 +89,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     private Bitmap? _runtimePlaybackFrameBitmap;
     private Bitmap? _selectedCandidateBitmap;
     private Bitmap? _selectedCandidateReferenceBitmap;
+    private Bitmap? _editorPreviewBitmap;
     private Bitmap? _editorBaselineBitmap;
     private Bitmap? _editorDiffBitmap;
     private readonly Dictionary<int, Rgba32[]> _editorLayerPixels = [];
@@ -108,12 +112,15 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     private bool _isLoadingFrameReview;
     private bool _isSynchronizingFrameQueueSelection;
     private bool _showRuntimeBlinkFrame;
+    private bool _showEditorBaselineBlinkFrame;
     private int _currentFrameIndex;
     private int _nextEditorLayerId = 1;
     private int _activeEditorLayerId;
     private bool _isSynchronizingSelection;
     private bool _isRestoringWorkspaceState;
     private int _playbackFrameIndex;
+    private readonly HashSet<string> _processedLiveOperationIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Queue<LiveOperationRecord> _pendingLiveOperations = new();
 
     [ObservableProperty] private string selectedSpeciesFilter = "All species";
     [ObservableProperty] private string selectedFamilyFilter = "All families";
@@ -201,11 +208,14 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty] private string projectPaletteMessage = "Project palettes let you reuse species- or project-specific color sets across manual and AI-assisted editing.";
     [ObservableProperty] private TrustedExportHistoryItemViewModel? selectedTrustedExportHistoryItem;
     [ObservableProperty] private ValidationReportItemViewModel? selectedValidationReportItem;
+    [ObservableProperty] private bool isEditorBlinkCompareEnabled;
     [ObservableProperty] private string projectValidationMessage = "Run validation to see how portable and healthy this linked sprite project is.";
     [ObservableProperty] private TrustedExportBlockerItemViewModel? selectedTrustedExportBlockerItem;
     [ObservableProperty] private PlanningUnmappedEntryItemViewModel? selectedPlanningUnmappedEntryItem;
     [ObservableProperty] private string projectKitMessage = "Export a reusable project kit when you want to move this workflow to another machine or teammate.";
     [ObservableProperty] private string validationSandboxMessage = "Create a blank validation sandbox to prove this app works beyond the linked project.";
+    [ObservableProperty] private string liveOperationStatusMessage = "No visible in-app operation has run yet.";
+    [ObservableProperty] private string liveOperationProgressSummary = "No visible steps queued.";
 
     public MainWindowViewModel() : this(null, null, null, string.Empty, null, null, string.Empty, null, null, string.Empty, null, null, null, null) { }
 
@@ -249,10 +259,15 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         Candidates = [];
         SelectedBaseVariantFamilyProgress = [];
         ActivityLog = [];
+        LiveOperationSteps = [];
         EditorToolOptions = [];
         EditorBrushSizeOptions = [];
         EditorZoomOptions = [];
+        _liveOperationTimer.Interval = TimeSpan.FromMilliseconds(700);
+        _liveOperationTimer.Tick += (_, _) => ProcessNextLiveOperation();
         EditorPalette = [];
+        EditorHuePresets = [];
+        EditorTonePresets = [];
         SavedEditorPalette = [];
         EditorLayers = [];
         EditorPixels = [];
@@ -267,11 +282,14 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         PlanningDiagnostics = [];
         PlanningTemplates = [];
         ProjectPalettes = [];
+        AiProviders = [];
         TrustedExportHistoryItems = [];
         ValidationReports = [];
         PlanningAdoptionEntries = [];
+        PlanningDiscoveryCategories = [];
         TrustedExportBlockers = [];
         PlanningUnmappedEntries = [];
+        ProjectReadinessItems = [];
         WorkflowActions = [];
 
         foreach (var status in ReviewStatuses)
@@ -324,6 +342,9 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         _previewTimer.Tick += OnPreviewTimerTick;
         _compareBlinkTimer.Interval = TimeSpan.FromMilliseconds(350);
         _compareBlinkTimer.Tick += OnCompareBlinkTimerTick;
+        _editorBlinkTimer.Interval = TimeSpan.FromMilliseconds(300);
+        _editorBlinkTimer.Tick += OnEditorBlinkTimerTick;
+        RebuildEditorQuickColorPresets();
 
         if (config is null || snapshot is null || !string.IsNullOrWhiteSpace(loadError))
         {
@@ -430,6 +451,14 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             action.Command,
             action.Arguments,
             ResolvePath(config.RootPath, action.WorkingDirectory))));
+        AiProviders = new ObservableCollection<AiProviderItemViewModel>(config.AiProviders.Select(provider => new AiProviderItemViewModel(
+            provider.ProviderId,
+            provider.DisplayName,
+            provider.ProviderKind,
+            provider.ExecutionMode,
+            provider.SupportsAutomation,
+            provider.Notes,
+            provider.ProviderId.Equals(config.DefaultAiProviderId, StringComparison.OrdinalIgnoreCase))));
 
         foreach (var species in snapshot.BaseVariants.Select(summary => summary.Species).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(species => species))
         {
@@ -447,23 +476,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             ViewerColorOptions.Add(color);
         }
 
-        var reviewLookup = (reviewData?.BaseVariantReviews ?? [])
-            .ToDictionary(review => BuildVariantKey(review.Species, review.Age, review.Gender), review => review, StringComparer.OrdinalIgnoreCase);
-        foreach (var frameReview in reviewData?.FrameReviews ?? [])
-        {
-            _frameReviewLookup[BuildFrameReviewKey(
-                frameReview.Species,
-                frameReview.Age,
-                frameReview.Gender,
-                frameReview.Color,
-                frameReview.Family,
-                frameReview.SequenceId,
-                frameReview.FrameIndex)] = frameReview;
-        }
-
         _allBaseVariants.AddRange(snapshot.BaseVariants.Select(summary =>
         {
-            reviewLookup.TryGetValue(BuildVariantKey(summary.Species, summary.Age, summary.Gender), out var review);
             return new BaseVariantRowItemViewModel(
                 summary.Species,
                 summary.Age,
@@ -472,48 +486,14 @@ public sealed partial class MainWindowViewModel : ViewModelBase
                 summary.OverallStatus,
                 summary.CompleteColorsByFamily.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase),
                 BuildFamilySummary(summary, _familyOrder),
-                review?.Status ?? "unreviewed",
-                review?.Note ?? string.Empty,
-                review?.UpdatedUtc);
+                "unreviewed",
+                string.Empty,
+                null);
         }));
 
-        foreach (var request in (requestData?.Requests ?? []).OrderByDescending(request => request.UpdatedUtc))
-        {
-            Requests.Add(new RequestItemViewModel(
-                request.RequestId,
-                request.RequestType,
-                request.Status,
-                request.Title,
-                request.TargetScope,
-                request.Details,
-                request.MustPreserve,
-                request.MustAvoid,
-                request.SourceNote,
-                (request.History ?? [])
-                    .OrderByDescending(entry => entry.UpdatedUtc)
-                    .Select(entry => new RequestHistoryItemViewModel(entry.EventType, entry.Message, entry.UpdatedUtc))
-                    .ToList(),
-                request.UpdatedUtc));
-        }
-
-        foreach (var candidate in (candidateData?.Candidates ?? []).OrderByDescending(candidate => candidate.UpdatedUtc))
-        {
-            Candidates.Add(new CandidateItemViewModel(
-                candidate.CandidateId,
-                candidate.Title,
-                candidate.TargetScope,
-                candidate.SourceType,
-                candidate.Status,
-                candidate.RequestId,
-                candidate.CandidateImagePath,
-                candidate.ReferenceImagePath,
-                candidate.TargetFramePath,
-                candidate.ImportBackupPath,
-                candidate.Note,
-                candidate.UpdatedUtc));
-        }
-
-        RefreshAutomationQueue();
+        ApplyReviewData(reviewData);
+        ApplyRequestData(requestData);
+        ApplyCandidateData(candidateData);
 
         AddActivity("project", $"Loaded {config.DisplayName}.");
 
@@ -536,6 +516,254 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         {
             _previewTimer.Start();
         }
+
+        NotifyCurrentTaskChanged();
+    }
+
+    public void ReloadExternalReviewData(ProjectReviewData? reviewData)
+    {
+        var selectedVariantKey = SelectedBaseVariant is null
+            ? string.Empty
+            : BuildVariantKey(SelectedBaseVariant.Species, SelectedBaseVariant.Age, SelectedBaseVariant.Gender);
+        var selectedFrameQueueKey = SelectedFrameReviewQueueItem is null
+            ? string.Empty
+            : BuildFrameReviewKey(
+                SelectedFrameReviewQueueItem.Species,
+                SelectedFrameReviewQueueItem.Age,
+                SelectedFrameReviewQueueItem.Gender,
+                SelectedFrameReviewQueueItem.Color,
+                SelectedFrameReviewQueueItem.Family,
+                SelectedFrameReviewQueueItem.SequenceId,
+                SelectedFrameReviewQueueItem.FrameIndex);
+
+        ApplyReviewData(reviewData);
+
+        if (!string.IsNullOrWhiteSpace(selectedVariantKey))
+        {
+            var matchingVariant = _allBaseVariants.FirstOrDefault(row =>
+                BuildVariantKey(row.Species, row.Age, row.Gender).Equals(selectedVariantKey, StringComparison.OrdinalIgnoreCase));
+            if (matchingVariant is not null && !ReferenceEquals(SelectedBaseVariant, matchingVariant))
+            {
+                SelectedBaseVariant = matchingVariant;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedFrameQueueKey))
+        {
+            var matchingFrame = FrameReviewQueueItems.FirstOrDefault(item =>
+                BuildFrameReviewKey(item.Species, item.Age, item.Gender, item.Color, item.Family, item.SequenceId, item.FrameIndex)
+                    .Equals(selectedFrameQueueKey, StringComparison.OrdinalIgnoreCase));
+            if (matchingFrame is not null && !ReferenceEquals(SelectedFrameReviewQueueItem, matchingFrame))
+            {
+                SelectedFrameReviewQueueItem = matchingFrame;
+            }
+        }
+
+        LoadCurrentFrameReview();
+        RefreshPlanningDiagnostics();
+        RefreshProjectReadiness();
+        NotifyCurrentTaskChanged();
+        FocusCurrentTask(false, true);
+        AddActivity("project", "Reloaded review data from disk.");
+    }
+
+    public void ReloadExternalRequestData(ProjectRequestData? requestData)
+    {
+        var selectedRequestId = SelectedRequestItem?.RequestId ?? SelectedAutomationTaskItem?.RequestId ?? string.Empty;
+        ApplyRequestData(requestData);
+
+        if (!string.IsNullOrWhiteSpace(selectedRequestId))
+        {
+            var matchingRequest = Requests.FirstOrDefault(request => request.RequestId.Equals(selectedRequestId, StringComparison.OrdinalIgnoreCase));
+            if (matchingRequest is not null && !Equals(SelectedRequestItem, matchingRequest))
+            {
+                SelectedRequestItem = matchingRequest;
+            }
+        }
+
+        RefreshPlanningDiagnostics();
+        RefreshProjectReadiness();
+        NotifyCurrentTaskChanged();
+        FocusCurrentTask(false, true);
+        AddActivity("project", "Reloaded request data from disk.");
+    }
+
+    public void ReloadExternalCandidateData(ProjectCandidateData? candidateData)
+    {
+        var selectedCandidateId = SelectedCandidateItem?.CandidateId ?? string.Empty;
+        ApplyCandidateData(candidateData);
+
+        if (!string.IsNullOrWhiteSpace(selectedCandidateId))
+        {
+            var matchingCandidate = Candidates.FirstOrDefault(candidate => candidate.CandidateId.Equals(selectedCandidateId, StringComparison.OrdinalIgnoreCase));
+            if (matchingCandidate is not null && !ReferenceEquals(SelectedCandidateItem, matchingCandidate))
+            {
+                SelectedCandidateItem = matchingCandidate;
+            }
+        }
+
+        RefreshPlanningDiagnostics();
+        RefreshProjectReadiness();
+        NotifyCurrentTaskChanged();
+        FocusCurrentTask(false, true);
+        AddActivity("project", "Reloaded candidate data from disk.");
+    }
+
+    public void ApplyLiveOperationLines(IEnumerable<string> lines)
+    {
+        foreach (var line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            LiveOperationRecord? operation;
+            try
+            {
+                operation = JsonSerializer.Deserialize<LiveOperationRecord>(line, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                });
+            }
+            catch (Exception ex)
+            {
+                AddActivity("session", $"Skipped invalid live operation: {ex.Message}");
+                continue;
+            }
+
+            if (operation is null)
+            {
+                continue;
+            }
+
+            NormalizeLiveOperation(operation);
+            if (string.IsNullOrWhiteSpace(operation.Op))
+            {
+                AddActivity("session", "Skipped live operation because no action/op was provided.");
+                continue;
+            }
+
+            var operationId = string.IsNullOrWhiteSpace(operation.Id)
+                ? $"{operation.Op}|{operation.RequestId}|{operation.Species}|{operation.Age}|{operation.Gender}|{operation.Color}|{operation.Family}|{operation.SequenceId}|{operation.FrameIndex}|{operation.X}|{operation.Y}|{operation.ColorHex}|{operation.Tool}"
+                : operation.Id;
+            if (!_processedLiveOperationIds.Add(operationId))
+            {
+                continue;
+            }
+
+            LiveOperationSteps.Add(new LiveOperationStepItemViewModel(
+                operationId,
+                BuildLiveOperationLabel(operation),
+                "queued",
+                BuildLiveOperationSummary(operation)));
+            _pendingLiveOperations.Enqueue(operation);
+        }
+
+        if (_pendingLiveOperations.Count > 0 && !_liveOperationTimer.IsEnabled)
+        {
+            LiveOperationStatusMessage = $"Queued {_pendingLiveOperations.Count} visible in-app step(s).";
+            LiveOperationProgressSummary = $"{_pendingLiveOperations.Count} step(s) queued.";
+            ProcessNextLiveOperation();
+        }
+    }
+
+    private void ProcessNextLiveOperation()
+    {
+        if (_pendingLiveOperations.Count == 0)
+        {
+            _liveOperationTimer.Stop();
+            return;
+        }
+
+        var operation = _pendingLiveOperations.Dequeue();
+        UpdateLiveOperationStep(operation, "running", BuildLiveOperationSummary(operation));
+        LiveOperationProgressSummary = $"{LiveOperationSteps.Count(step => step.Status.Equals("done", StringComparison.OrdinalIgnoreCase))} done / {LiveOperationSteps.Count} total";
+        try
+        {
+            ExecuteLiveOperation(operation);
+            UpdateLiveOperationStep(operation, "done", LiveOperationStatusMessage);
+        }
+        catch (Exception ex)
+        {
+            LiveOperationStatusMessage = $"Visible op '{operation.Op}' failed: {ex.Message}";
+            AddActivity("session", $"Visible op '{operation.Op}' failed: {ex.Message}");
+            UpdateLiveOperationStep(operation, "failed", ex.Message);
+        }
+
+        if (_pendingLiveOperations.Count == 0)
+        {
+            _liveOperationTimer.Stop();
+            LiveOperationProgressSummary = $"{LiveOperationSteps.Count(step => step.Status.Equals("done", StringComparison.OrdinalIgnoreCase))} done / {LiveOperationSteps.Count} total";
+            return;
+        }
+
+        _liveOperationTimer.Stop();
+        _liveOperationTimer.Start();
+    }
+
+    private string BuildLiveOperationLabel(LiveOperationRecord operation)
+    {
+        var op = string.IsNullOrWhiteSpace(operation.Op) ? "step" : operation.Op;
+        return string.Join(" ", op.Replace('_', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
+    }
+
+    private string BuildLiveOperationSummary(LiveOperationRecord operation)
+    {
+        return operation.Op switch
+        {
+            "focus_frame" => $"{operation.Species} / {operation.Age} / {operation.Gender} / {operation.Family} / {operation.SequenceId} / {operation.FrameId}",
+            "paint_pixel" or "erase_pixel" => $"{operation.X},{operation.Y}",
+            "set_color" => operation.ColorHex,
+            "set_tool" => operation.Tool,
+            _ => string.IsNullOrWhiteSpace(operation.FrameId) ? operation.Op : operation.FrameId
+        };
+    }
+
+    private void UpdateLiveOperationStep(LiveOperationRecord operation, string status, string summary)
+    {
+        var operationId = string.IsNullOrWhiteSpace(operation.Id)
+            ? $"{operation.Op}|{operation.RequestId}|{operation.Species}|{operation.Age}|{operation.Gender}|{operation.Color}|{operation.Family}|{operation.SequenceId}|{operation.FrameIndex}|{operation.X}|{operation.Y}|{operation.ColorHex}|{operation.Tool}"
+            : operation.Id;
+        var index = LiveOperationSteps.ToList().FindIndex(item => item.OperationId.Equals(operationId, StringComparison.OrdinalIgnoreCase));
+        if (index < 0)
+        {
+            return;
+        }
+
+        LiveOperationSteps[index] = new LiveOperationStepItemViewModel(
+            operationId,
+            BuildLiveOperationLabel(operation),
+            status,
+            summary);
+    }
+
+    private static void NormalizeLiveOperation(LiveOperationRecord operation)
+    {
+        if (!string.IsNullOrWhiteSpace(operation.FrameId))
+        {
+            var frameValue = operation.FrameId.Trim();
+            var underscoreIndex = frameValue.LastIndexOf('_');
+            if (underscoreIndex > 0 && underscoreIndex < frameValue.Length - 1)
+            {
+                if (string.IsNullOrWhiteSpace(operation.SequenceId))
+                {
+                    operation.SequenceId = frameValue[..underscoreIndex];
+                }
+
+                if (operation.FrameIndex is null &&
+                    int.TryParse(frameValue[(underscoreIndex + 1)..], out var parsedFrameIndex))
+                {
+                    operation.FrameIndex = parsedFrameIndex;
+                }
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void FocusCurrentTask()
+    {
+        FocusCurrentTask(true, false);
     }
 
     public string AppTitle { get; }
@@ -572,10 +800,13 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<CandidateItemViewModel> Candidates { get; }
     public ObservableCollection<FamilyProgressItemViewModel> SelectedBaseVariantFamilyProgress { get; }
     public ObservableCollection<ActivityLogItemViewModel> ActivityLog { get; }
+    public ObservableCollection<LiveOperationStepItemViewModel> LiveOperationSteps { get; }
     public ObservableCollection<string> EditorToolOptions { get; }
     public ObservableCollection<int> EditorBrushSizeOptions { get; }
     public ObservableCollection<int> EditorZoomOptions { get; }
     public ObservableCollection<EditorPaletteColorItemViewModel> EditorPalette { get; }
+    public ObservableCollection<ColorPresetItemViewModel> EditorHuePresets { get; }
+    public ObservableCollection<ColorPresetItemViewModel> EditorTonePresets { get; }
     public ObservableCollection<EditorPaletteColorItemViewModel> SavedEditorPalette { get; }
     public ObservableCollection<EditorLayerItemViewModel> EditorLayers { get; }
     public ObservableCollection<EditorPixelItemViewModel> EditorPixels { get; }
@@ -588,11 +819,14 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<PlanningDiagnosticItemViewModel> PlanningDiagnostics { get; }
     public ObservableCollection<PlanningTemplateItemViewModel> PlanningTemplates { get; }
     public ObservableCollection<ProjectPaletteItemViewModel> ProjectPalettes { get; }
+    public ObservableCollection<AiProviderItemViewModel> AiProviders { get; private set; }
     public ObservableCollection<TrustedExportHistoryItemViewModel> TrustedExportHistoryItems { get; }
     public ObservableCollection<ValidationReportItemViewModel> ValidationReports { get; }
     public ObservableCollection<PlanningAdoptionEntryItemViewModel> PlanningAdoptionEntries { get; }
+    public ObservableCollection<PlanningDiscoveryCategoryItemViewModel> PlanningDiscoveryCategories { get; }
     public ObservableCollection<TrustedExportBlockerItemViewModel> TrustedExportBlockers { get; }
     public ObservableCollection<PlanningUnmappedEntryItemViewModel> PlanningUnmappedEntries { get; }
+    public ObservableCollection<ProjectReadinessItemViewModel> ProjectReadinessItems { get; }
     public string AssetBrowserSummary => $"{FilteredBaseVariants.Count} of {_allBaseVariants.Count} base rows";
     public string RepairQueueSummary => $"{RepairQueueItems.Count} queued for repair";
     public string FrameReviewQueueSummary => $"{FrameReviewQueueItems.Count} flagged frame reviews";
@@ -601,6 +835,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     public string SelectedRequestHistorySummary => SelectedRequestItem is null
         ? "Select a saved request to see its activity history."
         : SelectedRequestItem.LatestHistorySummary;
+    public string SelectedRequestHealthSummary => SelectedRequestItem?.HealthSummary ?? "Select a saved request to see whether it still matches the current review state.";
     public string AutomationQueueSummary => $"{AutomationQueueItems.Count} automation tasks queued or in progress";
     public string SelectedAutomationTaskSummary => SelectedAutomationTaskItem is null
         ? "Select a queued request to show what the AI loop should work on next."
@@ -664,6 +899,17 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         5 => "Planning",
         _ => "Workspace"
     };
+    public bool HasCurrentTask => !string.IsNullOrWhiteSpace(CurrentTaskTitle);
+    public string CurrentTaskTitle => BuildCurrentTaskDescriptor().Title;
+    public string CurrentTaskSummary => BuildCurrentTaskDescriptor().Summary;
+    public string CurrentTaskTargetSummary => BuildCurrentTaskDescriptor().TargetSummary;
+    public string CurrentTaskWorkspaceHint => BuildCurrentTaskDescriptor().WorkspaceHint;
+    public string LiveWorkMonitorSummary => SelectedBaseVariant is null
+        ? "No active row is surfaced yet."
+        : $"{CurrentWorkspaceLabel}  |  {SelectedBaseVariant.DisplayName}  |  {SelectedViewerFamily}/{SelectedViewerSequenceId}  |  Edit {ViewerSelectionSummary}";
+    public string LiveWorkVisualHint => IsEditorFrameLoaded
+        ? "The pinned monitor mirrors the live editor canvas, authored target, and playback frame so the work stays visible even when the main Studio surface is farther down."
+        : "Once Paint loads a frame, the pinned monitor will mirror the editor canvas here so visible edits are easier to follow.";
     public string LoopGuideSummary => SelectedBaseVariant is null
         ? "Start in Review, pick a sprite row, then use Studio to preview, paint, save, and replay the animation without leaving the app."
         : $"Workspace: {CurrentWorkspaceLabel}  |  Row: {SelectedBaseVariant.DisplayName}  |  Preview: {SelectedViewerFamily}/{SelectedViewerSequenceId}  |  Frame: {ViewerSelectionSummary}";
@@ -681,6 +927,22 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         : IsEditorDirty
             ? "Save the edited frame and jump back to Animate to judge it in motion."
             : "The current frame is saved. Return to Animate to replay it.";
+    public string PaintEditTargetTitle => !IsEditorFrameLoaded
+        ? "No Paint Target Loaded"
+        : $"{SelectedBaseVariant?.DisplayName ?? "Selected row"}  |  {ViewerSelectionSummary}";
+    public string PaintEditTargetSummary => !IsEditorFrameLoaded
+        ? "Load the current authored frame, a runtime template, or a blank frame to begin painting."
+        : $"Paint target: {Path.GetFileName(string.IsNullOrWhiteSpace(_editorSaveFramePath) ? _loadedEditorFramePath : _editorSaveFramePath)}  |  Source view: {SelectedViewerFamily}/{SelectedViewerSequenceId}/{SelectedViewerColor}";
+    public string PaintEditStateSummary => !IsEditorFrameLoaded
+        ? "Nothing loaded in Paint yet."
+        : IsEditorDirty
+            ? "Unsaved edits are on the canvas now. Save + Replay when you want to judge this frame in motion."
+            : "This paint target is currently saved. Keep editing, or jump back to Animate to replay it.";
+    public string PaintNextStepSummary => !IsEditorFrameLoaded
+        ? "Best next step: choose a frame in Animate, then click Edit Current In Paint."
+        : IsEditorDirty
+            ? "Best next step: Save + Replay to test the current frame in motion."
+            : "Best next step: keep painting, or return to Animate to compare motion and references.";
     public string PaintMonitorSummary => !IsEditorFrameLoaded
         ? "Keep Paint open beside the selected references so the whole edit stays visible in the app."
         : $"Live canvas target: {Path.GetFileName(string.IsNullOrWhiteSpace(_editorSaveFramePath) ? _loadedEditorFramePath : _editorSaveFramePath)}  |  Selected frame: {ViewerSelectionSummary}";
@@ -694,6 +956,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         : $"{SelectedBaseVariant.DisplayName} -> {SelectedViewerFamily}/{SelectedViewerSequenceId} -> {ViewerSelectionSummary}";
     public string SelectedEditorColorSummary => $"Tool: {ToTitleCase(SelectedEditorTool)}  |  Brush {SelectedEditorBrushSize}px  |  Color: {SelectedEditorColorHex}";
     public string EditorHsvSummary => $"HSV: {EditorHue} deg / {EditorSaturation}% / {EditorValue}%";
+    public string EditorQuickColorSummary => $"Hue ring: {EditorHuePresets.Count} quick hues  |  Tone ramp: {EditorTonePresets.Count} current-hue variations";
     public string EditorHistorySummary => $"Undo {_undoHistory.Count}  |  Redo {_redoHistory.Count}";
     public string EditorLayerSummary => EditorLayers.Count == 0
         ? "No layers loaded."
@@ -709,13 +972,28 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     public string EditorSelectionSummary => _selectedEditorIndices.Count == 0
         ? (_editorClipboard is null ? "No active selection." : $"No active selection. Clipboard: {_editorClipboard.Width}x{_editorClipboard.Height}")
         : $"Selection: {_selectedEditorIndices.Count} px";
+    public string EditorSelectionBoundsSummary => TryGetSelectionBounds(out var minX, out var minY, out var maxX, out var maxY)
+        ? $"Bounds: {minX},{minY} -> {maxX},{maxY}  |  {(maxX - minX) + 1} x {(maxY - minY) + 1}"
+        : "Bounds: none";
+    public string EditorSelectionTransformHint => _selectedEditorIndices.Count == 0
+        ? "Select pixels to move, rotate, scale, flip, or lift them into their own layer."
+        : SelectedEditorTool.Equals("move", StringComparison.OrdinalIgnoreCase)
+            ? "Drag the selection directly on the canvas, or use the transform buttons for precise reshaping."
+            : "Use Move for direct dragging, or Rotate / Scale / Flip for controlled transforms.";
     public string EditorMirrorSummary => $"Mirror: {(EditorMirrorHorizontal ? "H" : "-")}/{(EditorMirrorVertical ? "V" : "-")}";
     public string EditorShapeModeSummary => EditorFillShapes ? "Shapes: filled" : "Shapes: outline";
     public string SavedPaletteSummary => SavedEditorPalette.Count == 0 ? "No saved swatches yet." : $"{SavedEditorPalette.Count} saved swatches";
     public string ProjectPaletteSummary => ProjectPalettes.Count == 0 ? "No project palettes yet." : $"{ProjectPalettes.Count} reusable project palette(s)";
+    public string AiProviderSummary => AiProviders.Count == 0 ? "No AI providers configured." : $"{AiProviders.Count} provider adapter(s) configured";
+    public string DefaultAiProviderSummary => AiProviders.FirstOrDefault(provider => provider.IsDefault) is { } provider
+        ? $"{provider.DisplayName} is the default provider. {provider.AutomationLabel} via {provider.ExecutionModeLabel}."
+        : "No default AI provider is configured yet.";
+    public string ProjectPaletteSaveHint => SelectedBaseVariant is null
+        ? "Save swatches as a project palette, or select a row first to also save a species palette."
+        : $"Save colors either as a project palette or as a {ToTitleCase(SelectedBaseVariant.Species)} palette you can reuse across that species.";
     public string SelectedProjectPaletteSummary => SelectedProjectPaletteItem is null
         ? "Select a saved project palette to reuse it here."
-        : $"{SelectedProjectPaletteItem.ColorSummary} | {SelectedProjectPaletteItem.UpdatedLabel}";
+        : $"{SelectedProjectPaletteItem.ScopeLabel} | {SelectedProjectPaletteItem.ColorSummary} | {SelectedProjectPaletteItem.UpdatedLabel}";
     public string TrustedExportHistorySummary => TrustedExportHistoryItems.Count == 0 ? "No trusted exports yet." : $"{TrustedExportHistoryItems.Count} trusted export bundle(s)";
     public string ValidationReportSummary => ValidationReports.Count == 0 ? "No validation reports yet." : $"{ValidationReports.Count} validation report(s)";
     public string SelectedValidationReportSummary => SelectedValidationReportItem is null
@@ -745,15 +1023,43 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     public string EditorTemplateSummary => string.IsNullOrWhiteSpace(_editorSaveFramePath)
         ? "No save target selected."
         : $"Editing target: {_editorSaveFramePath}";
+    public double EditorCanvasHeight => _editorHeight <= 0 ? 0 : _editorHeight * SelectedEditorZoom;
+    public bool HasEditorSelectionOverlay => _selectedEditorIndices.Count > 0 && _editorWidth > 0 && _editorHeight > 0;
+    public double EditorSelectionOverlayLeft => TryGetSelectionBounds(out var minX, out _, out _, out _)
+        ? minX * EditorPixelSize
+        : 0;
+    public double EditorSelectionOverlayTop => TryGetSelectionBounds(out _, out var minY, out _, out _)
+        ? minY * EditorPixelSize
+        : 0;
+    public double EditorSelectionOverlayWidth => TryGetSelectionBounds(out var minX, out _, out var maxX, out _)
+        ? Math.Max(EditorPixelSize, ((maxX - minX) + 1) * EditorPixelSize)
+        : 0;
+    public double EditorSelectionOverlayHeight => TryGetSelectionBounds(out _, out var minY, out _, out var maxY)
+        ? Math.Max(EditorPixelSize, ((maxY - minY) + 1) * EditorPixelSize)
+        : 0;
+    public double EditorSelectionHandleWestLeft => EditorSelectionOverlayLeft - 8;
+    public double EditorSelectionHandleEastLeft => EditorSelectionOverlayLeft + EditorSelectionOverlayWidth - 8;
+    public double EditorSelectionHandleNorthTop => EditorSelectionOverlayTop - 8;
+    public double EditorSelectionHandleSouthTop => EditorSelectionOverlayTop + EditorSelectionOverlayHeight - 8;
+    public double EditorSelectionHandleCenterX => EditorSelectionOverlayLeft + (EditorSelectionOverlayWidth / 2) - 8;
+    public double EditorSelectionHandleCenterY => EditorSelectionOverlayTop + (EditorSelectionOverlayHeight / 2) - 8;
+    public double EditorSelectionToolbarLeft => Math.Max(0, EditorSelectionOverlayLeft + (EditorSelectionOverlayWidth / 2) - 150);
+    public double EditorSelectionToolbarTop => Math.Max(0, EditorSelectionOverlayTop - 44);
     public string EditorComparisonSummary => !IsEditorFrameLoaded
         ? "Load a frame to compare the original, edited, and diff views."
         : $"{ChangedEditorPixelCount} changed pixels  |  Baseline: {Path.GetFileName(_loadedEditorFramePath)}";
+    public string EditorBlinkCompareSummary => !IsEditorFrameLoaded || !HasEditorBaselineBitmap
+        ? "Load a frame to blink between the baseline and current edit."
+        : IsEditorBlinkCompareEnabled
+            ? (_showEditorBaselineBlinkFrame ? "Blink compare: original baseline" : "Blink compare: current edit")
+            : "Blink compare is off.";
     public bool IsEditorFrameLoaded => _editorWidth > 0 && _editorHeight > 0 && EditorPixels.Count > 0;
     public bool IsEditorFrameMissing => !IsEditorFrameLoaded;
     public bool HasEditorBaselineBitmap => EditorBaselineBitmap is not null;
     public bool HasEditorDiffBitmap => EditorDiffBitmap is not null;
     public bool IsEditorBaselineBitmapMissing => !HasEditorBaselineBitmap;
     public bool IsEditorDiffBitmapMissing => !HasEditorDiffBitmap;
+    public Bitmap? EditorBlinkCompareBitmap => _showEditorBaselineBlinkFrame && HasEditorBaselineBitmap ? EditorBaselineBitmap : EditorPreviewBitmap;
     public int ChangedEditorPixelCount => CalculateChangedEditorPixelCount();
     public string EditorEmptyStateSummary => "Pick a row in Review, choose a family/sequence/color in Animate, then load the current frame or runtime template into Paint. The canvas stays disabled until a real frame is ready.";
     public double EditorCanvasWidth => _editorWidth <= 0 ? 0 : _editorWidth * SelectedEditorZoom;
@@ -785,6 +1091,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             ? $"Live playback is currently showing {PlaybackSelectionSummary}."
             : $"Live playback is parked on {PlaybackSelectionSummary}.")
         : "No authored playback frame is available for the current sequence.";
+    public string LiveDiffSummary => !IsEditorFrameLoaded
+        ? "Diff preview appears after Paint loads a frame."
+        : ChangedEditorPixelCount == 0
+            ? "No painted differences from the loaded baseline yet."
+            : $"{ChangedEditorPixelCount} changed pixel(s) from the loaded baseline.";
     public string LivePlaybackActionSummary => IsPlaybackEnabled
         ? "The live preview is moving independently from the edit target."
         : "Press Play to watch motion, or use the live frame as your new edit target.";
@@ -852,6 +1163,9 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         : string.Join("  |  ", PlanningChecklist.Select(item => $"{item.Family}: {item.SequenceCount} sequences / {item.FramesPerBaseRow} frames"));
     public string PlanningTemplateSummary => $"{PlanningTemplates.Count} saved blueprint templates";
     public string PlanningAdoptionEntrySummary => $"{PlanningAdoptionEntries.Count} planned sequence targets analyzed";
+    public string PlanningDiscoveryCategorySummary => PlanningDiscoveryCategories.Count == 0
+        ? "No discovery categories yet."
+        : string.Join("  |  ", PlanningDiscoveryCategories.Select(item => $"{item.Category}: {item.Count}"));
     public string PlanningStarterHint => PlanningChecklist.Count == 0
         ? "Start from scratch by listing species, axes, and family lines, or load the discovered project blueprint as a starting point."
         : "Use this blueprint to drive manual art, AI requests, or automated repair/generation loops without leaving the app.";
@@ -875,6 +1189,9 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     }
     public string TrustedExportBlockerSummary => BuildTrustedExportBlockerSummary();
     public string FrameHistorySummary => $"{FrameHistoryItems.Count} saved history snapshots";
+    public string ProjectReadinessSummary => ProjectReadinessItems.Count == 0
+        ? "Project readiness has not been evaluated yet."
+        : $"{ProjectReadinessItems.Count(item => item.Status.Equals("ready", StringComparison.OrdinalIgnoreCase))} ready  |  {ProjectReadinessItems.Count(item => item.Status.Equals("needs_attention", StringComparison.OrdinalIgnoreCase))} need attention";
     public int PlanningBaseRowCount => ParsePlanningList(PlanningSpeciesText).Count * Math.Max(1, ParsePlanningList(PlanningAgeText).Count) * Math.Max(1, ParsePlanningList(PlanningGenderText).Count);
     public int PlanningVariantTargetCount => PlanningBaseRowCount * Math.Max(1, ParsePlanningList(PlanningColorText).Count);
     public int PlanningSequenceTargetCount => PlanningChecklist.Sum(item => item.SequenceCount);
@@ -919,6 +1236,12 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     {
         get => _previousFrameReferenceBitmap;
         private set => SetBitmap(ref _previousFrameReferenceBitmap, value);
+    }
+
+    public Bitmap? EditorPreviewBitmap
+    {
+        get => _editorPreviewBitmap;
+        private set => SetBitmap(ref _editorPreviewBitmap, value);
     }
 
     public Bitmap? NextFrameReferenceBitmap
@@ -1097,15 +1420,13 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void OpenReviewWorkspace()
     {
-        SelectedWorkspaceTabIndex = 1;
-        AddActivity("review", "Opened Review workspace.");
+        SurfaceReviewWorkspace(true);
     }
 
     [RelayCommand]
     private void OpenPlanningWorkspace()
     {
-        SelectedWorkspaceTabIndex = 5;
-        AddActivity("planning", "Opened Planning workspace.");
+        SurfacePlanningWorkspace(true);
     }
 
     [RelayCommand]
@@ -1587,6 +1908,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
         config = new ProjectConfig
         {
+            SchemaVersion = 1,
             ProjectId = projectId,
             DisplayName = string.IsNullOrWhiteSpace(PlanningDisplayName) ? projectId : PlanningDisplayName.Trim(),
             RootPath = rootPath,
@@ -1597,6 +1919,28 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             ReviewDataPath = ".sprite-workflow/reviews.json",
             RequestDataPath = ".sprite-workflow/requests.json",
             CandidateDataPath = ".sprite-workflow/candidates.json",
+            DefaultAiProviderId = "generic-browser-ai",
+            AiProviders =
+            [
+                new AiProviderConfig
+                {
+                    ProviderId = "generic-browser-ai",
+                    DisplayName = "Generic Browser AI",
+                    ProviderKind = "browser_chat",
+                    ExecutionMode = "manual_browser",
+                    SupportsAutomation = false,
+                    Notes = "Provider-agnostic visible browser handoff for prompts, generations, and repair attempts.",
+                },
+                new AiProviderConfig
+                {
+                    ProviderId = "local-hidden-tools",
+                    DisplayName = "Local Hidden Workflow Tools",
+                    ProviderKind = "local_process",
+                    ExecutionMode = "hidden_process",
+                    SupportsAutomation = true,
+                    Notes = "Use app-owned hidden processes for validation, exports, and other local automation helpers.",
+                }
+            ],
             VariantAxes = new VariantAxesConfig
             {
                 Species = ParsePlanningList(PlanningSpeciesText).ToArray(),
@@ -1737,18 +2081,14 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void OpenAnimateWorkspace()
     {
-        SelectedWorkspaceTabIndex = 4;
-        SelectedStudioTabIndex = 0;
-        AddActivity("viewer", "Opened Animate workspace.");
+        SurfaceAnimateWorkspace(true);
     }
 
     [RelayCommand]
     private void OpenPaintWorkspace()
     {
         IsPlaybackEnabled = false;
-        SelectedWorkspaceTabIndex = 4;
-        SelectedStudioTabIndex = 1;
-        AddActivity("editor", "Opened Paint workspace.");
+        SurfacePaintWorkspace(true);
     }
 
     [RelayCommand]
@@ -2513,6 +2853,19 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void UseQuickColorPreset(ColorPresetItemViewModel? preset)
+    {
+        if (preset is null)
+        {
+            return;
+        }
+
+        SelectedEditorColorHex = preset.HexColor;
+        UpdatePaletteSelection();
+        EditorStatusMessage = $"Selected {preset.HexColor} from the quick color picker.";
+    }
+
+    [RelayCommand]
     private void SelectEditorLayer(EditorLayerItemViewModel? layer)
     {
         if (layer is null || !_editorLayerPixels.ContainsKey(layer.LayerId))
@@ -2710,6 +3063,49 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         AddActivity("editor", EditorStatusMessage);
     }
 
+    [RelayCommand]
+    private void CopySelectionToNewLayer()
+    {
+        var activeLayer = GetActiveLayerItem();
+        if (activeLayer is null)
+        {
+            EditorStatusMessage = "No active layer to copy from.";
+            return;
+        }
+
+        if (_selectedEditorIndices.Count == 0)
+        {
+            EditorStatusMessage = "Select pixels before copying them into a new layer.";
+            return;
+        }
+
+        var selectedPixels = GetSelectedPixelsSnapshot()
+            .Where(pixel => pixel.Color.A > 0)
+            .ToList();
+        if (selectedPixels.Count == 0)
+        {
+            EditorStatusMessage = "The current selection has no painted pixels to copy.";
+            return;
+        }
+
+        CaptureUndoState();
+        var copiedPixels = new Rgba32[_editorWidth * _editorHeight];
+        foreach (var pixel in selectedPixels)
+        {
+            copiedPixels[(pixel.Y * _editorWidth) + pixel.X] = pixel.Color;
+        }
+
+        var layer = CreateEditorLayer($"{activeLayer.Name} Overlay", copiedPixels, isVisible: true, selectLayer: true, isLocked: false);
+        RefreshEditorComposite();
+        RefreshEditorPixels();
+        RefreshEditorPalette();
+        RefreshEditorComparisonState();
+        SetSelectedEditorIndices(selectedPixels.Select(pixel => (pixel.Y * _editorWidth) + pixel.X));
+        IsEditorDirty = true;
+        EditorStatusMessage = $"Copied {selectedPixels.Count} pixels from {activeLayer.Name} into {layer.Name}.";
+        AddActivity("editor", EditorStatusMessage);
+    }
+
     private bool TryAddReferenceLayer(string sourcePath, string layerPrefix, int opacityPercent, out string successMessage, out string errorMessage)
     {
         successMessage = string.Empty;
@@ -2719,7 +3115,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         {
             foreach (var existingLayer in EditorLayers.Where(layer => layer.Name.StartsWith(layerPrefix, StringComparison.OrdinalIgnoreCase)).ToList())
             {
-                existingLayer.ThumbnailBitmap?.Dispose();
+                existingLayer.ThumbnailBitmap = null;
                 DetachLayerHandlers(existingLayer);
                 _editorLayerPixels.Remove(existingLayer.LayerId);
                 EditorLayers.Remove(existingLayer);
@@ -2860,7 +3256,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        activeLayer.ThumbnailBitmap?.Dispose();
+        activeLayer.ThumbnailBitmap = null;
         DetachLayerHandlers(activeLayer);
         _editorLayerPixels.Remove(activeLayer.LayerId);
         EditorLayers.Remove(activeLayer);
@@ -2913,7 +3309,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         }
 
         _editorLayerPixels[targetLayer.LayerId] = mergedPixels;
-        activeLayer.ThumbnailBitmap?.Dispose();
+        activeLayer.ThumbnailBitmap = null;
         DetachLayerHandlers(activeLayer);
         _editorLayerPixels.Remove(activeLayer.LayerId);
         EditorLayers.Remove(activeLayer);
@@ -2947,7 +3343,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         CaptureUndoState();
         foreach (var layer in visibleLayers)
         {
-            layer.ThumbnailBitmap?.Dispose();
+            layer.ThumbnailBitmap = null;
             DetachLayerHandlers(layer);
             _editorLayerPixels.Remove(layer.LayerId);
             EditorLayers.Remove(layer);
@@ -2962,6 +3358,34 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(EditorLayerSummary));
         IsEditorDirty = true;
         EditorStatusMessage = $"Flattened {visibleLayers.Count} visible layers into {flattenedLayer.Name}.";
+    }
+
+    [RelayCommand]
+    private void FlattenVisibleCopyToNewLayer()
+    {
+        if (_editorPixels.Length == 0 || EditorLayers.Count == 0)
+        {
+            EditorStatusMessage = "Load a frame before creating a flattened copy.";
+            return;
+        }
+
+        var visibleLayers = EditorLayers.Count(layer => layer.IsVisible);
+        if (visibleLayers == 0)
+        {
+            EditorStatusMessage = "There are no visible layers to flatten into a copy.";
+            return;
+        }
+
+        CaptureUndoState();
+        var layer = CreateEditorLayer("Flattened Copy", (Rgba32[])_editorPixels.Clone(), isVisible: true, selectLayer: true, isLocked: false);
+        RefreshEditorComposite();
+        RefreshEditorPixels();
+        RefreshEditorPalette();
+        RefreshEditorComparisonState();
+        OnPropertyChanged(nameof(EditorLayerSummary));
+        IsEditorDirty = true;
+        EditorStatusMessage = $"Created {layer.Name} from {visibleLayers} visible layers without collapsing the stack.";
+        AddActivity("editor", EditorStatusMessage);
     }
 
     [RelayCommand]
@@ -3001,7 +3425,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         _editorLayerPixels[targetLayer.LayerId] = merged;
         targetLayer.OpacityPercent = 100;
         targetLayer.IsVisible = targetLayer.IsVisible || activeLayer.IsVisible;
-        activeLayer.ThumbnailBitmap?.Dispose();
+        activeLayer.ThumbnailBitmap = null;
         DetachLayerHandlers(activeLayer);
         _editorLayerPixels.Remove(activeLayer.LayerId);
         EditorLayers.Remove(activeLayer);
@@ -3095,6 +3519,23 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void SaveSavedSwatchesAsProjectPalette()
     {
+        SaveCurrentSwatchesAsPalette("project");
+    }
+
+    [RelayCommand]
+    private void SaveSavedSwatchesAsSpeciesPalette()
+    {
+        if (SelectedBaseVariant is null)
+        {
+            ProjectPaletteMessage = "Select a sprite row before saving a species palette.";
+            return;
+        }
+
+        SaveCurrentSwatchesAsPalette("species");
+    }
+
+    private void SaveCurrentSwatchesAsPalette(string scopeKind)
+    {
         var colors = SavedEditorPalette
             .Select(item => item.HexColor)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -3105,11 +3546,17 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        var paletteName = BuildProjectPaletteName();
-        var existing = ProjectPalettes.FirstOrDefault(item => item.Name.Equals(paletteName, StringComparison.OrdinalIgnoreCase));
+        var scopeKey = BuildProjectPaletteScopeKey(scopeKind);
+        var paletteName = BuildProjectPaletteName(scopeKind);
+        var existing = ProjectPalettes.FirstOrDefault(item =>
+            item.Name.Equals(paletteName, StringComparison.OrdinalIgnoreCase) &&
+            item.ScopeKind.Equals(scopeKind, StringComparison.OrdinalIgnoreCase) &&
+            item.ScopeKey.Equals(scopeKey, StringComparison.OrdinalIgnoreCase));
         var updated = new ProjectPaletteItemViewModel(
             existing?.PaletteId ?? Guid.NewGuid().ToString("N"),
             paletteName,
+            scopeKind,
+            scopeKey,
             colors,
             DateTimeOffset.UtcNow);
 
@@ -3126,7 +3573,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         PersistProjectPalettes();
         OnPropertyChanged(nameof(ProjectPaletteSummary));
         OnPropertyChanged(nameof(SelectedProjectPaletteSummary));
-        ProjectPaletteMessage = $"Saved project palette '{paletteName}'.";
+        ProjectPaletteMessage = $"Saved {updated.ScopeLabel.ToLowerInvariant()} '{paletteName}'.";
         AddActivity("editor", ProjectPaletteMessage);
     }
 
@@ -3390,6 +3837,64 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     [RelayCommand]
     private void ScaleSelectionDown() => ScaleSelectedPixels(0.5, "Scaled selection down 50%.");
+
+    [RelayCommand]
+    private void ResizeSelectionFromHandle(string? handle)
+    {
+        if (!TryGetSelectionBounds(out var minX, out var minY, out var maxX, out var maxY))
+        {
+            EditorStatusMessage = "Select pixels before using the on-canvas handles.";
+            return;
+        }
+
+        var deltaLeft = 0;
+        var deltaTop = 0;
+        var deltaRight = 0;
+        var deltaBottom = 0;
+        var label = handle ?? string.Empty;
+
+        switch ((handle ?? string.Empty).ToUpperInvariant())
+        {
+            case "W":
+                deltaLeft = -1;
+                break;
+            case "E":
+                deltaRight = 1;
+                break;
+            case "N":
+                deltaTop = -1;
+                break;
+            case "S":
+                deltaBottom = 1;
+                break;
+            case "NW":
+                deltaLeft = -1;
+                deltaTop = -1;
+                break;
+            case "NE":
+                deltaRight = 1;
+                deltaTop = -1;
+                break;
+            case "SW":
+                deltaLeft = -1;
+                deltaBottom = 1;
+                break;
+            case "SE":
+                deltaRight = 1;
+                deltaBottom = 1;
+                break;
+            default:
+                EditorStatusMessage = "Unknown transform handle.";
+                return;
+        }
+
+        ResizeSelectedPixelsToBounds(
+            Math.Max(0, minX + deltaLeft),
+            Math.Max(0, minY + deltaTop),
+            Math.Min(_editorWidth - 1, maxX + deltaRight),
+            Math.Min(_editorHeight - 1, maxY + deltaBottom),
+            $"Expanded selection from handle {label}.");
+    }
 
     public void ApplyEditorTool(EditorPixelItemViewModel? pixel)
     {
@@ -3684,7 +4189,10 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         }
 
         OnPropertyChanged(nameof(EditorSelectionSummary));
+        OnPropertyChanged(nameof(EditorSelectionBoundsSummary));
+        OnPropertyChanged(nameof(EditorSelectionTransformHint));
         OnPropertyChanged(nameof(EditorLayerWorkflowHint));
+        NotifyEditorSelectionOverlayChanged();
     }
 
     private bool TryGetSelectionBounds(out int minX, out int minY, out int maxX, out int maxY)
@@ -3837,6 +4345,47 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             var normalizedY = height == 1 ? 0.0 : localY / (double)(height - 1);
             var targetX = minX + (int)Math.Round(normalizedX * Math.Max(0, scaledWidth - 1));
             var targetY = minY + (int)Math.Round(normalizedY * Math.Max(0, scaledHeight - 1));
+            return (targetX, targetY);
+        });
+
+        EditorStatusMessage = successMessage;
+    }
+
+    private void ResizeSelectedPixelsToBounds(int newMinX, int newMinY, int newMaxX, int newMaxY, string successMessage)
+    {
+        if (!TryGetSelectionBounds(out var minX, out var minY, out var maxX, out var maxY))
+        {
+            EditorStatusMessage = "Select pixels before resizing them.";
+            return;
+        }
+
+        if (newMaxX < newMinX || newMaxY < newMinY)
+        {
+            EditorStatusMessage = "That resize would collapse the selection.";
+            return;
+        }
+
+        if (newMinX == minX && newMinY == minY && newMaxX == maxX && newMaxY == maxY)
+        {
+            EditorStatusMessage = "The selection is already at the edge of the canvas.";
+            return;
+        }
+
+        var selectedPixels = GetSelectedPixelsSnapshot();
+        var width = maxX - minX + 1;
+        var height = maxY - minY + 1;
+        var newWidth = newMaxX - newMinX + 1;
+        var newHeight = newMaxY - newMinY + 1;
+
+        CaptureUndoState();
+        ApplySelectedPixels(selectedPixels, pixel =>
+        {
+            var localX = width == 1 ? 0 : pixel.X - minX;
+            var localY = height == 1 ? 0 : pixel.Y - minY;
+            var normalizedX = width == 1 ? 0.0 : localX / (double)(width - 1);
+            var normalizedY = height == 1 ? 0.0 : localY / (double)(height - 1);
+            var targetX = newMinX + (int)Math.Round(normalizedX * Math.Max(0, newWidth - 1));
+            var targetY = newMinY + (int)Math.Round(normalizedY * Math.Max(0, newHeight - 1));
             return (targetX, targetY);
         });
 
@@ -4354,11 +4903,13 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     {
         if (_editorWidth <= 0 || _editorHeight <= 0 || _editorPixels.Length == 0 || _editorBaselinePixels.Length != _editorPixels.Length)
         {
+            EditorPreviewBitmap = null;
             EditorBaselineBitmap = null;
             EditorDiffBitmap = null;
         }
         else
         {
+            EditorPreviewBitmap = CreateBitmapFromPixels(_editorPixels);
             EditorBaselineBitmap = CreateBitmapFromPixels(_editorBaselinePixels);
 
             var diffPixels = new Rgba32[_editorPixels.Length];
@@ -4374,6 +4925,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(ChangedEditorPixelCount));
         OnPropertyChanged(nameof(EditorComparisonSummary));
+        OnPropertyChanged(nameof(EditorBlinkCompareBitmap));
+        OnPropertyChanged(nameof(EditorBlinkCompareSummary));
         OnPropertyChanged(nameof(HasEditorBaselineBitmap));
         OnPropertyChanged(nameof(IsEditorBaselineBitmapMissing));
         OnPropertyChanged(nameof(HasEditorDiffBitmap));
@@ -4841,6 +5394,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             DraftRequestMustPreserve.Trim(),
             DraftRequestMustAvoid.Trim(),
             DraftRequestSourceNote.Trim(),
+            BuildRequestHealthSummary(
+                DraftRequestTargetScope.Trim(),
+                DraftRequestTitle.Trim(),
+                DraftRequestDetails.Trim(),
+                DraftRequestSourceNote.Trim()),
             history,
             updatedUtc);
         if (existing is not null)
@@ -5177,6 +5735,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         IsPlaybackEnabled = false;
         UpdateSequenceOptions(true);
         UpdateViewer();
+        OnPropertyChanged(nameof(ProjectPaletteSaveHint));
         NotifyLoopStateChanged();
         PersistWorkspaceState();
     }
@@ -5187,6 +5746,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         _currentFrameIndex = 0;
         _playbackFrameIndex = 0;
         UpdateViewer();
+        OnPropertyChanged(nameof(ProjectPaletteSaveHint));
         NotifyLoopStateChanged();
         PersistWorkspaceState();
     }
@@ -5206,6 +5766,22 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     partial void OnAutoCaptureOnStrokeChanged(bool value) => OnPropertyChanged(nameof(EditorCaptureSummary));
     partial void OnAutoCaptureOnSaveChanged(bool value) => OnPropertyChanged(nameof(EditorCaptureSummary));
     partial void OnLastEditorCapturePathChanged(string value) => OnPropertyChanged(nameof(LastEditorCaptureSummary));
+    partial void OnIsEditorBlinkCompareEnabledChanged(bool value)
+    {
+        if (value && HasEditorBaselineBitmap && IsEditorFrameLoaded)
+        {
+            _showEditorBaselineBlinkFrame = false;
+            _editorBlinkTimer.Start();
+        }
+        else
+        {
+            _editorBlinkTimer.Stop();
+            _showEditorBaselineBlinkFrame = false;
+        }
+
+        OnPropertyChanged(nameof(EditorBlinkCompareSummary));
+        OnPropertyChanged(nameof(EditorBlinkCompareBitmap));
+    }
     partial void OnControlModeChanged(string value)
     {
         OnPropertyChanged(nameof(ControlModeSummary));
@@ -5265,7 +5841,9 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     partial void OnSelectedEditorZoomChanged(int value)
     {
         OnPropertyChanged(nameof(EditorCanvasWidth));
+        OnPropertyChanged(nameof(EditorCanvasHeight));
         OnPropertyChanged(nameof(EditorPixelSize));
+        NotifyEditorSelectionOverlayChanged();
         EditorStatusMessage = $"Zoom set to {value}px per sprite pixel.";
     }
 
@@ -5424,6 +6002,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedBaseVariantFrameQualitySummary));
         OnPropertyChanged(nameof(SelectedBaseVariantFrameIssueSummary));
         OnPropertyChanged(nameof(CurrentFrameReviewTargetSummary));
+        OnPropertyChanged(nameof(ProjectPaletteSaveHint));
         UpdateAuditProgressSummary();
         NotifyLoopStateChanged();
         PersistWorkspaceState();
@@ -5455,6 +6034,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         _isSynchronizingSelection = true;
         SelectedBaseVariant = value;
         _isSynchronizingSelection = false;
+        SurfaceQueueWorkspace(false);
+        NotifyCurrentTaskChanged();
     }
 
     partial void OnSelectedFrameReviewQueueItemChanged(FrameReviewQueueItemViewModel? value)
@@ -5494,6 +6075,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         _playbackFrameIndex = value.FrameIndex;
         UpdateViewer();
         _isSynchronizingFrameQueueSelection = false;
+        SurfaceAnimateWorkspace(false);
+        NotifyCurrentTaskChanged();
         AddActivity("review", $"Jumped to flagged frame {value.FrameId} from the frame review queue.");
     }
 
@@ -5514,9 +6097,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         DraftRequestSourceNote = value.SourceNote;
         RequestSaveMessage = $"Loaded request '{value.Title}' into the draft editor.";
         OnPropertyChanged(nameof(DraftRequestPreview));
+        OnPropertyChanged(nameof(SelectedRequestHealthSummary));
         OnPropertyChanged(nameof(StudioAiHandoffSummary));
         OnPropertyChanged(nameof(SelectedAutomationTaskHistorySummary));
         TryNavigateToTargetScope(value.TargetScope);
+        NotifyCurrentTaskChanged();
     }
 
     partial void OnSelectedAutomationTaskItemChanged(AutomationTaskItemViewModel? value)
@@ -5529,6 +6114,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedAutomationTaskCandidates));
         OnPropertyChanged(nameof(SelectedAutomationTaskLinkedCandidatesSummary));
         OnPropertyChanged(nameof(StudioAiHandoffSummary));
+        NotifyCurrentTaskChanged();
 
         if (value is null)
         {
@@ -5560,6 +6146,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         LoadSelectedCandidatePreview(newValue);
         OnPropertyChanged(nameof(SelectedCandidateSummary));
         OnPropertyChanged(nameof(SelectedCandidateTargetSummary));
+        NotifyCurrentTaskChanged();
         OnPropertyChanged(nameof(StudioCandidateHandoffSummary));
     }
 
@@ -5720,6 +6307,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         _isSynchronizingEditorColor = false;
         SyncHsvFromChannels();
         OnPropertyChanged(nameof(EditorSelectedColorBrush));
+        RebuildEditorQuickColorPresets();
     }
 
     private void SyncHsvFromChannels()
@@ -5766,6 +6354,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         EditorValue = (int)Math.Round(max * 100);
         _isSynchronizingEditorHsv = false;
         OnPropertyChanged(nameof(EditorHsvSummary));
+        RebuildEditorQuickColorPresets();
     }
 
     private void SyncChannelsFromHsv()
@@ -5777,9 +6366,66 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
         _isSynchronizingEditorHsv = true;
 
-        var hue = ((EditorHue % 360) + 360) % 360;
-        var saturation = Math.Clamp(EditorSaturation / 100.0, 0.0, 1.0);
-        var value = Math.Clamp(EditorValue / 100.0, 0.0, 1.0);
+        var color = CreateColorFromHsv(EditorHue, EditorSaturation, EditorValue, EditorAlpha);
+        _isSynchronizingEditorColor = true;
+        EditorRed = color.R;
+        EditorGreen = color.G;
+        EditorBlue = color.B;
+        _isSynchronizingEditorColor = false;
+        _isSynchronizingEditorHsv = false;
+
+        SelectedEditorColorHex = ToHexColor(color);
+        OnPropertyChanged(nameof(EditorSelectedColorBrush));
+        OnPropertyChanged(nameof(EditorHsvSummary));
+        RebuildEditorQuickColorPresets();
+    }
+
+    private void RebuildEditorQuickColorPresets()
+    {
+        EditorHuePresets.Clear();
+        EditorTonePresets.Clear();
+
+        for (var index = 0; index < 12; index++)
+        {
+            var hue = index * 30;
+            var color = CreateColorFromHsv(hue, 100, 100, EditorAlpha);
+            var hex = ToHexColor(color);
+            EditorHuePresets.Add(new ColorPresetItemViewModel(
+                $"{hue} deg",
+                hex,
+                CreateBrush(color),
+                $"Hue {hue}"));
+        }
+
+        var toneSteps = new (string Label, int Saturation, int Value)[]
+        {
+            ("Shadow", Math.Min(EditorSaturation + 10, 100), 22),
+            ("Deep", Math.Min(EditorSaturation + 5, 100), 38),
+            ("Base", EditorSaturation, Math.Max(EditorValue, 48)),
+            ("Soft", Math.Max(EditorSaturation - 20, 0), Math.Max(EditorValue, 68)),
+            ("Light", Math.Max(EditorSaturation - 30, 0), 82),
+            ("Highlight", Math.Max(EditorSaturation - 40, 0), 95)
+        };
+
+        foreach (var step in toneSteps)
+        {
+            var color = CreateColorFromHsv(EditorHue, step.Saturation, step.Value, EditorAlpha);
+            var hex = ToHexColor(color);
+            EditorTonePresets.Add(new ColorPresetItemViewModel(
+                step.Label,
+                hex,
+                CreateBrush(color),
+                $"{step.Label}: {hex}"));
+        }
+
+        OnPropertyChanged(nameof(EditorQuickColorSummary));
+    }
+
+    private static Rgba32 CreateColorFromHsv(int hueDegrees, int saturationPercent, int valuePercent, int alpha)
+    {
+        var hue = ((hueDegrees % 360) + 360) % 360;
+        var saturation = Math.Clamp(saturationPercent / 100.0, 0.0, 1.0);
+        var value = Math.Clamp(valuePercent / 100.0, 0.0, 1.0);
         var chroma = value * saturation;
         var huePrime = hue / 60.0;
         var x = chroma * (1 - Math.Abs((huePrime % 2) - 1));
@@ -5795,21 +6441,33 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         };
 
         var match = value - chroma;
-        _isSynchronizingEditorColor = true;
-        EditorRed = (int)Math.Round((redPrime + match) * 255);
-        EditorGreen = (int)Math.Round((greenPrime + match) * 255);
-        EditorBlue = (int)Math.Round((bluePrime + match) * 255);
-        _isSynchronizingEditorColor = false;
-        _isSynchronizingEditorHsv = false;
-
-        SelectedEditorColorHex = ToHexColor(new Rgba32((byte)EditorRed, (byte)EditorGreen, (byte)EditorBlue, (byte)EditorAlpha));
-        OnPropertyChanged(nameof(EditorSelectedColorBrush));
-        OnPropertyChanged(nameof(EditorHsvSummary));
+        return new Rgba32(
+            (byte)Math.Round((redPrime + match) * 255),
+            (byte)Math.Round((greenPrime + match) * 255),
+            (byte)Math.Round((bluePrime + match) * 255),
+            (byte)Math.Clamp(alpha, 0, 255));
     }
 
     private void NotifyEditorHistoryChanged()
     {
         OnPropertyChanged(nameof(EditorHistorySummary));
+    }
+
+    private void NotifyEditorSelectionOverlayChanged()
+    {
+        OnPropertyChanged(nameof(HasEditorSelectionOverlay));
+        OnPropertyChanged(nameof(EditorSelectionOverlayLeft));
+        OnPropertyChanged(nameof(EditorSelectionOverlayTop));
+        OnPropertyChanged(nameof(EditorSelectionOverlayWidth));
+        OnPropertyChanged(nameof(EditorSelectionOverlayHeight));
+        OnPropertyChanged(nameof(EditorSelectionHandleWestLeft));
+        OnPropertyChanged(nameof(EditorSelectionHandleEastLeft));
+        OnPropertyChanged(nameof(EditorSelectionHandleNorthTop));
+        OnPropertyChanged(nameof(EditorSelectionHandleSouthTop));
+        OnPropertyChanged(nameof(EditorSelectionHandleCenterX));
+        OnPropertyChanged(nameof(EditorSelectionHandleCenterY));
+        OnPropertyChanged(nameof(EditorSelectionToolbarLeft));
+        OnPropertyChanged(nameof(EditorSelectionToolbarTop));
     }
 
     private void LoadEditorFrame(string? framePath, bool forceReload, string? saveTargetPath = null)
@@ -5896,11 +6554,14 @@ public sealed partial class MainWindowViewModel : ViewModelBase
                 : $"Loaded template {Path.GetFileName(framePath)}. Saving goes to {Path.GetFileName(_editorSaveFramePath)}.";
             OnPropertyChanged(nameof(EditorCanvasSummary));
             OnPropertyChanged(nameof(EditorCanvasWidth));
+            OnPropertyChanged(nameof(EditorCanvasHeight));
             OnPropertyChanged(nameof(EditorPixelSize));
             OnPropertyChanged(nameof(EditorTemplateSummary));
             OnPropertyChanged(nameof(EditorSelectedColorBrush));
             NotifyEditorHistoryChanged();
             OnPropertyChanged(nameof(EditorSelectionSummary));
+            OnPropertyChanged(nameof(EditorSelectionBoundsSummary));
+            OnPropertyChanged(nameof(EditorSelectionTransformHint));
             OnPropertyChanged(nameof(IsEditorFrameLoaded));
             OnPropertyChanged(nameof(IsEditorFrameMissing));
             OnPropertyChanged(nameof(EditorComparisonSummary));
@@ -6102,7 +6763,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     {
         foreach (var layer in EditorLayers.ToList())
         {
-            layer.ThumbnailBitmap?.Dispose();
+            layer.ThumbnailBitmap = null;
             DetachLayerHandlers(layer);
         }
 
@@ -6296,12 +6957,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     private static void SetLayerThumbnail(EditorLayerItemViewModel layer, Bitmap? bitmap)
     {
-        var previous = layer.ThumbnailBitmap;
         layer.ThumbnailBitmap = bitmap;
-        if (!ReferenceEquals(previous, bitmap))
-        {
-            previous?.Dispose();
-        }
     }
 
     private Rgba32 CompositePixelAt(int index)
@@ -6398,9 +7054,10 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     private void ClearEditor(string message)
     {
+        IsEditorBlinkCompareEnabled = false;
         foreach (var layer in EditorLayers.ToList())
         {
-            layer.ThumbnailBitmap?.Dispose();
+            layer.ThumbnailBitmap = null;
             DetachLayerHandlers(layer);
         }
 
@@ -6425,6 +7082,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         _movePreviewPixels = null;
         _shapePreviewBasePixels = null;
         EditorLoadedFramePath = string.Empty;
+        EditorPreviewBitmap = null;
         EditorBaselineBitmap = null;
         EditorDiffBitmap = null;
         EditorPixels.Clear();
@@ -6435,16 +7093,21 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         EditorStatusMessage = message;
         OnPropertyChanged(nameof(EditorCanvasSummary));
         OnPropertyChanged(nameof(EditorCanvasWidth));
+        OnPropertyChanged(nameof(EditorCanvasHeight));
         OnPropertyChanged(nameof(EditorPixelSize));
         OnPropertyChanged(nameof(EditorTemplateSummary));
         OnPropertyChanged(nameof(EditorSelectedColorBrush));
         OnPropertyChanged(nameof(EditorSelectionSummary));
+        OnPropertyChanged(nameof(EditorSelectionBoundsSummary));
+        OnPropertyChanged(nameof(EditorSelectionTransformHint));
         OnPropertyChanged(nameof(IsEditorFrameLoaded));
-        OnPropertyChanged(nameof(IsEditorFrameMissing));
-        OnPropertyChanged(nameof(EditorComparisonSummary));
-        OnPropertyChanged(nameof(HasEditorBaselineBitmap));
-        OnPropertyChanged(nameof(IsEditorBaselineBitmapMissing));
-        OnPropertyChanged(nameof(HasEditorDiffBitmap));
+            OnPropertyChanged(nameof(IsEditorFrameMissing));
+            OnPropertyChanged(nameof(EditorComparisonSummary));
+            OnPropertyChanged(nameof(EditorBlinkCompareSummary));
+            OnPropertyChanged(nameof(EditorBlinkCompareBitmap));
+            OnPropertyChanged(nameof(HasEditorBaselineBitmap));
+            OnPropertyChanged(nameof(IsEditorBaselineBitmapMissing));
+            OnPropertyChanged(nameof(HasEditorDiffBitmap));
         OnPropertyChanged(nameof(IsEditorDiffBitmapMissing));
         OnPropertyChanged(nameof(SavedPaletteSummary));
         OnPropertyChanged(nameof(EditorLayerSummary));
@@ -6546,12 +7209,14 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(TrustedExportBlockerSummary));
         RefreshTrustedExportBlockers();
         RefreshPlanningDiagnostics();
+        RefreshProjectReadiness();
     }
 
     private void RefreshPlanningDiagnostics()
     {
         PlanningDiagnostics.Clear();
         PlanningAdoptionEntries.Clear();
+        PlanningDiscoveryCategories.Clear();
         PlanningUnmappedEntries.Clear();
 
         var plannedSpecies = ParsePlanningList(PlanningSpeciesText);
@@ -6651,8 +7316,75 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             }
         }
 
+        var mappedCount = PlanningAdoptionEntries.Count(entry => entry.StatusLabel.Equals("Complete", StringComparison.OrdinalIgnoreCase));
+        var conflictingCount = PlanningAdoptionEntries.Count(entry =>
+            entry.ExtraFrames > 0 ||
+            (entry.ExistingFrames > 0 && entry.ExistingFrames < entry.ExpectedFrames));
+        var extraCount = PlanningAdoptionEntries.Count(entry => entry.ExtraFrames > 0);
+        var unmappedCount = PlanningUnmappedEntries.Count;
+
+        PlanningDiscoveryCategories.Add(new PlanningDiscoveryCategoryItemViewModel(
+            "Mapped",
+            mappedCount,
+            "Discovered sequences fully align with the current planning checklist."));
+        PlanningDiscoveryCategories.Add(new PlanningDiscoveryCategoryItemViewModel(
+            "Unmapped",
+            unmappedCount,
+            "Discovered PNGs are visible on disk but do not currently belong to the planned checklist."));
+        PlanningDiscoveryCategories.Add(new PlanningDiscoveryCategoryItemViewModel(
+            "Conflicting",
+            conflictingCount,
+            "These sequences exist but do not match the planned frame contract cleanly yet."));
+        PlanningDiscoveryCategories.Add(new PlanningDiscoveryCategoryItemViewModel(
+            "Extra",
+            extraCount,
+            "These planned sequence targets contain extra discovered frame files beyond the expected count."));
+
+        RefreshProjectReadiness();
         OnPropertyChanged(nameof(PlanningAdoptionEntrySummary));
+        OnPropertyChanged(nameof(PlanningDiscoveryCategorySummary));
         OnPropertyChanged(nameof(PlanningUnmappedEntrySummary));
+    }
+
+    private void RefreshProjectReadiness()
+    {
+        ProjectReadinessItems.Clear();
+        var trustedSnapshot = BuildTrustedExportSnapshot();
+        var hasDefaultProvider = AiProviders.Any(provider => provider.IsDefault);
+        var hasValidationReport = ValidationReports.Count > 0;
+        var hasTrustedExportHistory = TrustedExportHistoryItems.Count > 0;
+        var discoveryNeedsAttention = PlanningUnmappedEntries.Count > 0 ||
+                                      PlanningAdoptionEntries.Any(entry =>
+                                          !entry.StatusLabel.Equals("Complete", StringComparison.OrdinalIgnoreCase));
+
+        ProjectReadinessItems.Add(new ProjectReadinessItemViewModel(
+            "AI Provider Setup",
+            hasDefaultProvider ? "ready" : "needs_attention",
+            hasDefaultProvider
+                ? DefaultAiProviderSummary
+                : "Add at least one provider adapter so requests, attempts, and candidates stay provider-agnostic."));
+        ProjectReadinessItems.Add(new ProjectReadinessItemViewModel(
+            "Review Approval",
+            trustedSnapshot.FlaggedFrameCount == 0 && trustedSnapshot.ApprovedFrameCount > 0 ? "ready" : "needs_attention",
+            TrustedExportSummary));
+        ProjectReadinessItems.Add(new ProjectReadinessItemViewModel(
+            "Planning Adoption",
+            discoveryNeedsAttention ? "needs_attention" : "ready",
+            PlanningDiscoveryCategorySummary));
+        ProjectReadinessItems.Add(new ProjectReadinessItemViewModel(
+            "Validation",
+            hasValidationReport ? "ready" : "needs_attention",
+            hasValidationReport
+                ? SelectedValidationReportSummary
+                : "Run validation to produce a reusable portability and project-health report."));
+        ProjectReadinessItems.Add(new ProjectReadinessItemViewModel(
+            "Export Readiness",
+            hasTrustedExportHistory ? "ready" : "needs_attention",
+            hasTrustedExportHistory
+                ? TrustedExportHistorySummary
+                : "Create a trusted export bundle once the approved set is ready to ship or hand off."));
+
+        OnPropertyChanged(nameof(ProjectReadinessSummary));
     }
 
     private static string BuildAxisDeltaSummary(string missingLabel, IEnumerable<string> missingValues, string extraLabel, IEnumerable<string> extraValues)
@@ -7195,6 +7927,17 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(ActivitySummary));
     }
 
+    private void NotifyCurrentTaskChanged()
+    {
+        OnPropertyChanged(nameof(HasCurrentTask));
+        OnPropertyChanged(nameof(CurrentTaskTitle));
+        OnPropertyChanged(nameof(CurrentTaskSummary));
+        OnPropertyChanged(nameof(CurrentTaskTargetSummary));
+        OnPropertyChanged(nameof(CurrentTaskWorkspaceHint));
+        OnPropertyChanged(nameof(LiveWorkMonitorSummary));
+        OnPropertyChanged(nameof(LiveWorkVisualHint));
+    }
+
     private void NotifyLoopStateChanged()
     {
         OnPropertyChanged(nameof(CurrentWorkspaceLabel));
@@ -7203,6 +7946,10 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(AnimateStepSummary));
         OnPropertyChanged(nameof(PaintStepSummary));
         OnPropertyChanged(nameof(SaveReplayStepSummary));
+        OnPropertyChanged(nameof(PaintEditTargetTitle));
+        OnPropertyChanged(nameof(PaintEditTargetSummary));
+        OnPropertyChanged(nameof(PaintEditStateSummary));
+        OnPropertyChanged(nameof(PaintNextStepSummary));
         OnPropertyChanged(nameof(PaintMonitorSummary));
         OnPropertyChanged(nameof(CoreLoopSummary));
         OnPropertyChanged(nameof(HasCurrentFrameBitmap));
@@ -7210,6 +7957,476 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasRuntimeFrameBitmap));
         OnPropertyChanged(nameof(IsRuntimeFrameBitmapMissing));
         OnPropertyChanged(nameof(HasOnionSkinBitmap));
+        NotifyCurrentTaskChanged();
+    }
+
+    private void ApplyReviewData(ProjectReviewData? reviewData)
+    {
+        var reviewLookup = (reviewData?.BaseVariantReviews ?? [])
+            .ToDictionary(review => BuildVariantKey(review.Species, review.Age, review.Gender), review => review, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var row in _allBaseVariants)
+        {
+            reviewLookup.TryGetValue(BuildVariantKey(row.Species, row.Age, row.Gender), out var review);
+            row.ReviewStatus = review?.Status ?? "unreviewed";
+            row.ReviewNote = review?.Note ?? string.Empty;
+            row.ReviewUpdatedUtc = review?.UpdatedUtc;
+        }
+
+        _frameReviewLookup.Clear();
+        foreach (var frameReview in reviewData?.FrameReviews ?? [])
+        {
+            _frameReviewLookup[BuildFrameReviewKey(
+                frameReview.Species,
+                frameReview.Age,
+                frameReview.Gender,
+                frameReview.Color,
+                frameReview.Family,
+                frameReview.SequenceId,
+                frameReview.FrameIndex)] = frameReview;
+        }
+
+        RefreshRepairQueue();
+        RefreshFrameReviewQueue();
+        RefreshVariantFrameQuality();
+        RefreshTrustedExportBlockers();
+        OnPropertyChanged(nameof(SelectedBaseVariantReviewSummary));
+        OnPropertyChanged(nameof(SelectedBaseVariantFrameQualitySummary));
+        OnPropertyChanged(nameof(SelectedBaseVariantFrameIssueSummary));
+        OnPropertyChanged(nameof(NeedsReviewSummary));
+    }
+
+    private void ApplyRequestData(ProjectRequestData? requestData)
+    {
+        var selectedRequestId = SelectedRequestItem?.RequestId ?? string.Empty;
+
+        Requests.Clear();
+        foreach (var request in (requestData?.Requests ?? []).OrderByDescending(request => request.UpdatedUtc))
+        {
+            Requests.Add(new RequestItemViewModel(
+                request.RequestId,
+                request.RequestType,
+                request.Status,
+                request.Title,
+                request.TargetScope,
+                request.Details,
+                request.MustPreserve,
+                request.MustAvoid,
+                request.SourceNote,
+                BuildRequestHealthSummary(request.TargetScope, request.Title, request.Details, request.SourceNote),
+                (request.History ?? [])
+                    .OrderByDescending(entry => entry.UpdatedUtc)
+                    .Select(entry => new RequestHistoryItemViewModel(entry.EventType, entry.Message, entry.UpdatedUtc))
+                    .ToList(),
+                request.UpdatedUtc));
+        }
+
+        SelectedRequestItem = string.IsNullOrWhiteSpace(selectedRequestId)
+            ? Requests.FirstOrDefault()
+            : Requests.FirstOrDefault(request => request.RequestId.Equals(selectedRequestId, StringComparison.OrdinalIgnoreCase))
+                ?? Requests.FirstOrDefault();
+
+        RefreshAutomationQueue();
+        OnPropertyChanged(nameof(RequestSummary));
+        OnPropertyChanged(nameof(SelectedRequestHealthSummary));
+        OnPropertyChanged(nameof(SelectedRequestHistorySummary));
+        OnPropertyChanged(nameof(DraftRequestPreview));
+        OnPropertyChanged(nameof(StudioAiHandoffSummary));
+    }
+
+    private void ApplyCandidateData(ProjectCandidateData? candidateData)
+    {
+        var selectedCandidateId = SelectedCandidateItem?.CandidateId ?? string.Empty;
+
+        Candidates.Clear();
+        foreach (var candidate in (candidateData?.Candidates ?? []).OrderByDescending(candidate => candidate.UpdatedUtc))
+        {
+            Candidates.Add(new CandidateItemViewModel(
+                candidate.CandidateId,
+                candidate.Title,
+                candidate.TargetScope,
+                candidate.SourceType,
+                candidate.Status,
+                candidate.RequestId,
+                candidate.CandidateImagePath,
+                candidate.ReferenceImagePath,
+                candidate.TargetFramePath,
+                candidate.ImportBackupPath,
+                candidate.Note,
+                candidate.UpdatedUtc));
+        }
+
+        SelectedCandidateItem = string.IsNullOrWhiteSpace(selectedCandidateId)
+            ? Candidates.FirstOrDefault()
+            : Candidates.FirstOrDefault(candidate => candidate.CandidateId.Equals(selectedCandidateId, StringComparison.OrdinalIgnoreCase))
+                ?? Candidates.FirstOrDefault();
+
+        RefreshAutomationQueue();
+        OnPropertyChanged(nameof(CandidateSummary));
+        OnPropertyChanged(nameof(SelectedCandidateSummary));
+        OnPropertyChanged(nameof(SelectedCandidateTargetSummary));
+        OnPropertyChanged(nameof(StudioCandidateHandoffSummary));
+    }
+
+    private void FocusCurrentTask(bool surfaceWorkspace, bool logActivity)
+    {
+        var frameTask = SelectedFrameReviewQueueItem ?? FrameReviewQueueItems.FirstOrDefault();
+        if (frameTask is not null)
+        {
+            if (!ReferenceEquals(SelectedFrameReviewQueueItem, frameTask))
+            {
+                SelectedFrameReviewQueueItem = frameTask;
+            }
+            else if (surfaceWorkspace)
+            {
+                SurfaceAnimateWorkspace(false);
+            }
+
+            if (logActivity)
+            {
+                AddActivity("review", $"Focused current task: {frameTask.FrameId}.");
+            }
+
+            return;
+        }
+
+        var automationTask = SelectedAutomationTaskItem ?? AutomationQueueItems.FirstOrDefault();
+        if (automationTask is not null)
+        {
+            if (!ReferenceEquals(SelectedAutomationTaskItem, automationTask))
+            {
+                SelectedAutomationTaskItem = automationTask;
+            }
+
+            if (surfaceWorkspace)
+            {
+                TryNavigateToTargetScope(automationTask.TargetScope);
+            }
+            else
+            {
+                TryNavigateToTargetScope(automationTask.TargetScope);
+            }
+
+            if (logActivity)
+            {
+                AddActivity("automation", $"Focused current task: {automationTask.DisplayName}.");
+            }
+
+            return;
+        }
+
+        var requestTask = SelectedRequestItem ?? Requests.FirstOrDefault(request =>
+            !request.Status.Equals("approved", StringComparison.OrdinalIgnoreCase) &&
+            !request.Status.Equals("completed", StringComparison.OrdinalIgnoreCase) &&
+            !request.Status.Equals("rejected", StringComparison.OrdinalIgnoreCase));
+        if (requestTask is not null)
+        {
+            if (!Equals(SelectedRequestItem, requestTask))
+            {
+                SelectedRequestItem = requestTask;
+            }
+            else if (surfaceWorkspace)
+            {
+                SurfaceRequestsWorkspace(false);
+                TryNavigateToTargetScope(requestTask.TargetScope);
+            }
+
+            if (logActivity)
+            {
+                AddActivity("request", $"Focused current task: {requestTask.Title}.");
+            }
+
+            return;
+        }
+
+        var candidateTask = SelectedCandidateItem ?? Candidates.FirstOrDefault(candidate =>
+            !candidate.Status.Equals("approved", StringComparison.OrdinalIgnoreCase) &&
+            !candidate.Status.Equals("rejected", StringComparison.OrdinalIgnoreCase));
+        if (candidateTask is not null)
+        {
+            if (!ReferenceEquals(SelectedCandidateItem, candidateTask))
+            {
+                SelectedCandidateItem = candidateTask;
+            }
+            else if (surfaceWorkspace)
+            {
+                SurfaceRequestsWorkspace(false);
+            }
+
+            if (logActivity)
+            {
+                AddActivity("candidate", $"Focused current task: {candidateTask.Title}.");
+            }
+        }
+    }
+
+    private CurrentTaskDescriptor BuildCurrentTaskDescriptor()
+    {
+        var frameTask = SelectedFrameReviewQueueItem ?? FrameReviewQueueItems.FirstOrDefault();
+        if (frameTask is not null)
+        {
+            return new CurrentTaskDescriptor(
+                $"Flagged Frame: {frameTask.FrameId}",
+                $"{frameTask.StatusLabel}  |  {frameTask.DisplayName}  |  {frameTask.IssueTagSummary}",
+                $"{frameTask.Family}/{frameTask.SequenceId}  |  {frameTask.Color}",
+                "Studio / Animate is the live focus. Pause on this frame, edit it in Paint, then save and replay.");
+        }
+
+        var automationTask = SelectedAutomationTaskItem ?? AutomationQueueItems.FirstOrDefault();
+        if (automationTask is not null)
+        {
+            return new CurrentTaskDescriptor(
+                $"AI Task: {automationTask.DisplayName}",
+                $"{automationTask.StatusLabel}  |  {automationTask.TypeLabel}  |  {automationTask.LatestActivitySummary}",
+                string.IsNullOrWhiteSpace(automationTask.TargetScope) ? "No target scope recorded yet." : automationTask.TargetScope,
+                "An AI task is active, but the visible work surface should stay on the target frame in Studio whenever a concrete frame needs repair.");
+        }
+
+        var requestTask = SelectedRequestItem ?? Requests.FirstOrDefault(request =>
+            !request.Status.Equals("approved", StringComparison.OrdinalIgnoreCase) &&
+            !request.Status.Equals("completed", StringComparison.OrdinalIgnoreCase) &&
+            !request.Status.Equals("rejected", StringComparison.OrdinalIgnoreCase));
+        if (requestTask is not null)
+        {
+            return new CurrentTaskDescriptor(
+                $"Saved Request: {requestTask.Title}",
+                $"{requestTask.StatusLabel}  |  {requestTask.TypeLabel}  |  {requestTask.HealthSummary}",
+                string.IsNullOrWhiteSpace(requestTask.TargetScope) ? "No target scope recorded yet." : requestTask.TargetScope,
+                "Requests is the live focus. Review the target, refine the request, then queue or hand it off visibly.");
+        }
+
+        var candidateTask = SelectedCandidateItem ?? Candidates.FirstOrDefault();
+        if (candidateTask is not null)
+        {
+            return new CurrentTaskDescriptor(
+                $"Candidate: {candidateTask.Title}",
+                $"{candidateTask.StatusLabel}  |  {candidateTask.SourceTypeLabel}  |  {candidateTask.NotePreview}",
+                string.IsNullOrWhiteSpace(candidateTask.TargetScope) ? "No target scope recorded yet." : candidateTask.TargetScope,
+                "Requests is the live focus. Compare, load into Paint, apply, or reject this candidate visibly.");
+        }
+
+        return new CurrentTaskDescriptor(
+            "No active task",
+            "The project is loaded, but there is no queued automation, flagged frame, pending request, or staged candidate in focus.",
+            "Pick a row in Review or Queue to start visible work.",
+            "Review is usually the right place to begin a new audit or repair pass.");
+    }
+
+    private void ExecuteLiveOperation(LiveOperationRecord operation)
+    {
+        var op = operation.Op.Trim().ToLowerInvariant();
+        switch (op)
+        {
+            case "focus_request":
+                if (!string.IsNullOrWhiteSpace(operation.RequestId))
+                {
+                    var request = Requests.FirstOrDefault(item => item.RequestId.Equals(operation.RequestId, StringComparison.OrdinalIgnoreCase));
+                    if (request is not null)
+                    {
+                        SelectedRequestItem = request;
+                        LiveOperationStatusMessage = $"Focused request {request.RequestId}.";
+                        AddActivity("session", $"Visible op focused request {request.RequestId}.");
+                    }
+                }
+                break;
+            case "focus_frame":
+                if (TryFocusLiveOperationFrame(operation))
+                {
+                    LiveOperationStatusMessage = $"Focused frame {ViewerSelectionSummary} for visible work.";
+                    AddActivity("session", $"Visible op focused frame {ViewerSelectionSummary}.");
+                }
+                break;
+            case "open_animate":
+                OpenAnimateWorkspace();
+                LiveOperationStatusMessage = "Opened Animate in the visible work surface.";
+                AddActivity("session", "Visible op opened Animate.");
+                break;
+            case "open_paint":
+                OpenPaintWorkspace();
+                LiveOperationStatusMessage = "Opened Paint in the visible work surface.";
+                AddActivity("session", "Visible op opened Paint.");
+                break;
+            case "load_current_frame":
+                LoadCurrentFrameIntoEditor();
+                LiveOperationStatusMessage = "Loaded the current authored frame into Paint.";
+                AddActivity("session", "Visible op loaded the current authored frame into Paint.");
+                break;
+            case "load_runtime_template":
+                LoadRuntimeFrameIntoEditor();
+                LiveOperationStatusMessage = "Loaded the runtime template into Paint.";
+                AddActivity("session", "Visible op loaded the runtime template into Paint.");
+                break;
+            case "play_preview":
+                PlayPreview();
+                LiveOperationStatusMessage = $"Started playback on {PlaybackSelectionSummary}.";
+                AddActivity("session", "Visible op started playback.");
+                break;
+            case "pause_preview":
+                PausePreview();
+                LiveOperationStatusMessage = $"Paused playback on {ViewerSelectionSummary}.";
+                AddActivity("session", "Visible op paused playback.");
+                break;
+            case "stage_authored_candidate":
+                StageCurrentAuthoredCandidate();
+                LiveOperationStatusMessage = "Staged the current authored frame as a candidate.";
+                AddActivity("session", "Visible op staged the authored frame as a candidate.");
+                break;
+            case "stage_runtime_candidate":
+                StageRuntimeCandidate();
+                LiveOperationStatusMessage = "Staged the current runtime frame as a candidate.";
+                AddActivity("session", "Visible op staged the runtime frame as a candidate.");
+                break;
+            case "set_tool":
+                if (!string.IsNullOrWhiteSpace(operation.Tool))
+                {
+                    SelectedEditorTool = operation.Tool.Trim().ToLowerInvariant();
+                    LiveOperationStatusMessage = $"Set the editor tool to {SelectedEditorTool}.";
+                    AddActivity("session", $"Visible op set the tool to {SelectedEditorTool}.");
+                }
+                break;
+            case "set_color":
+                if (!string.IsNullOrWhiteSpace(operation.ColorHex))
+                {
+                    SelectedEditorColorHex = operation.ColorHex;
+                    LiveOperationStatusMessage = $"Set the editor color to {SelectedEditorColorHex}.";
+                    AddActivity("session", $"Visible op set the color to {SelectedEditorColorHex}.");
+                }
+                break;
+            case "set_brush_size":
+                if (operation.BrushSize is { } brushSize)
+                {
+                    SelectedEditorBrushSize = Math.Clamp(brushSize, 1, 8);
+                    LiveOperationStatusMessage = $"Set the brush size to {SelectedEditorBrushSize}px.";
+                    AddActivity("session", $"Visible op set the brush size to {SelectedEditorBrushSize}px.");
+                }
+                break;
+            case "paint_pixel":
+                ApplyLivePixelOperation(operation, erase: false);
+                break;
+            case "erase_pixel":
+                ApplyLivePixelOperation(operation, erase: true);
+                break;
+            case "save_frame":
+                SaveEditedFrame();
+                LiveOperationStatusMessage = "Saved the current Paint frame.";
+                AddActivity("session", "Visible op saved the current frame.");
+                break;
+            case "save_and_replay":
+                SaveAndReturnToAnimate();
+                LiveOperationStatusMessage = "Saved the frame and returned to Animate.";
+                AddActivity("session", "Visible op saved and returned to Animate.");
+                break;
+            default:
+                LiveOperationStatusMessage = $"Skipped unknown live operation '{operation.Op}'.";
+                AddActivity("session", $"Skipped unknown visible op '{operation.Op}'.");
+                break;
+        }
+    }
+
+    private bool TryFocusLiveOperationFrame(LiveOperationRecord operation)
+    {
+        if (string.IsNullOrWhiteSpace(operation.Species) ||
+            string.IsNullOrWhiteSpace(operation.Age) ||
+            string.IsNullOrWhiteSpace(operation.Gender))
+        {
+            return false;
+        }
+
+        var variant = _allBaseVariants.FirstOrDefault(row =>
+            row.Species.Equals(operation.Species, StringComparison.OrdinalIgnoreCase) &&
+            row.Age.Equals(operation.Age, StringComparison.OrdinalIgnoreCase) &&
+            row.Gender.Equals(operation.Gender, StringComparison.OrdinalIgnoreCase));
+        if (variant is null)
+        {
+            return false;
+        }
+
+        SelectedBaseVariant = variant;
+        if (!string.IsNullOrWhiteSpace(operation.Color) && ViewerColorOptions.Contains(operation.Color))
+        {
+            SelectedViewerColor = operation.Color;
+        }
+
+        if (!string.IsNullOrWhiteSpace(operation.Family) && ViewerFamilyOptions.Contains(operation.Family))
+        {
+            SelectedViewerFamily = operation.Family;
+        }
+
+        if (!string.IsNullOrWhiteSpace(operation.SequenceId))
+        {
+            UpdateSequenceOptions(false);
+            if (ViewerSequenceOptions.Contains(operation.SequenceId))
+            {
+                SelectedViewerSequenceId = operation.SequenceId;
+            }
+        }
+
+        if (operation.FrameIndex is { } frameIndex)
+        {
+            _currentFrameIndex = Math.Max(0, frameIndex);
+            _playbackFrameIndex = Math.Max(0, frameIndex);
+        }
+
+        SurfaceAnimateWorkspace(false);
+        UpdateViewer();
+        return true;
+    }
+
+    private void ApplyLivePixelOperation(LiveOperationRecord operation, bool erase)
+    {
+        if (operation.X is null || operation.Y is null || EditorPixels.Count == 0)
+        {
+            AddActivity("session", "Visible pixel op skipped because Paint has no loaded frame.");
+            return;
+        }
+
+        var pixel = EditorPixels.FirstOrDefault(item => item.X == operation.X.Value && item.Y == operation.Y.Value);
+        if (pixel is null)
+        {
+            AddActivity("session", $"Visible pixel op skipped because {operation.X},{operation.Y} is outside the current canvas.");
+            return;
+        }
+
+        if (!erase && !string.IsNullOrWhiteSpace(operation.ColorHex))
+        {
+            SelectedEditorColorHex = operation.ColorHex;
+        }
+
+        SelectedEditorTool = erase ? "erase" : "brush";
+        ApplyEditorTool(pixel);
+        LiveOperationStatusMessage = erase
+            ? $"Erased pixel {pixel.X},{pixel.Y} on the live canvas."
+            : $"Painted pixel {pixel.X},{pixel.Y} on the live canvas.";
+        AddActivity("session", erase
+            ? $"Visible op erased pixel {pixel.X},{pixel.Y}."
+            : $"Visible op painted pixel {pixel.X},{pixel.Y}.");
+    }
+
+    private readonly record struct CurrentTaskDescriptor(string Title, string Summary, string TargetSummary, string WorkspaceHint);
+    private sealed class LiveOperationRecord
+    {
+        public string Id { get; set; } = string.Empty;
+        [JsonPropertyName("action")]
+        public string Op { get; set; } = string.Empty;
+        [JsonPropertyName("request")]
+        public string RequestId { get; set; } = string.Empty;
+        public string Species { get; set; } = string.Empty;
+        public string Age { get; set; } = string.Empty;
+        public string Gender { get; set; } = string.Empty;
+        public string Color { get; set; } = string.Empty;
+        public string Family { get; set; } = string.Empty;
+        [JsonPropertyName("sequence")]
+        public string SequenceId { get; set; } = string.Empty;
+        [JsonPropertyName("frame_index")]
+        public int? FrameIndex { get; set; }
+        [JsonPropertyName("frame")]
+        public string FrameId { get; set; } = string.Empty;
+        public int? X { get; set; }
+        public int? Y { get; set; }
+        public string ColorHex { get; set; } = string.Empty;
+        public string Tool { get; set; } = string.Empty;
+        [JsonPropertyName("brush_size")]
+        public int? BrushSize { get; set; }
     }
 
     private static string FormatFamilyRow(SpeciesCoverageSummary summary, string family)
@@ -7231,6 +8448,148 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     private static string BuildFrameReviewKey(string species, string age, string gender, string color, string family, string sequenceId, int frameIndex)
         => $"{species}|{age}|{gender}|{color}|{family}|{sequenceId}|{frameIndex}";
+
+    private string BuildRequestHealthSummary(string targetScope, string title, string details, string sourceNote)
+    {
+        var parts = (targetScope ?? string.Empty)
+            .Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 3)
+        {
+            return "Custom or non-row target. Review it manually before queueing AI work.";
+        }
+
+        var species = parts[0];
+        var age = parts[1];
+        var gender = parts[2];
+        var variant = _allBaseVariants.FirstOrDefault(row =>
+            row.Species.Equals(species, StringComparison.OrdinalIgnoreCase) &&
+            row.Age.Equals(age, StringComparison.OrdinalIgnoreCase) &&
+            row.Gender.Equals(gender, StringComparison.OrdinalIgnoreCase));
+        if (variant is null)
+        {
+            return "Target row is not currently mapped in this project.";
+        }
+
+        var inferredFamily = InferRequestFamily(title, details, sourceNote);
+        var relevantReviews = _frameReviewLookup.Values.Where(record =>
+            record.Species.Equals(species, StringComparison.OrdinalIgnoreCase) &&
+            record.Age.Equals(age, StringComparison.OrdinalIgnoreCase) &&
+            record.Gender.Equals(gender, StringComparison.OrdinalIgnoreCase) &&
+            (string.IsNullOrWhiteSpace(inferredFamily) || record.Family.Equals(inferredFamily, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        var flaggedCount = relevantReviews.Count(record =>
+            record.Status.Equals("needs_review", StringComparison.OrdinalIgnoreCase) ||
+            record.Status.Equals("to_be_repaired", StringComparison.OrdinalIgnoreCase) ||
+            record.Status.Equals("do_not_use", StringComparison.OrdinalIgnoreCase));
+        var templateCount = relevantReviews.Count(record =>
+            record.Status.Equals("template_only", StringComparison.OrdinalIgnoreCase));
+
+        if (flaggedCount > 0)
+        {
+            return inferredFamily is null
+                ? $"{flaggedCount} flagged frame(s) still exist for this row."
+                : $"{flaggedCount} flagged frame(s) still exist in {inferredFamily}.";
+        }
+
+        if (variant.ReviewStatus.Equals("needs_review", StringComparison.OrdinalIgnoreCase) ||
+            variant.ReviewStatus.Equals("to_be_repaired", StringComparison.OrdinalIgnoreCase) ||
+            variant.ReviewStatus.Equals("do_not_use", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"Row is still marked {FormatStatusLabel(variant.ReviewStatus)}.";
+        }
+
+        if (variant.ReviewStatus.Equals("approved", StringComparison.OrdinalIgnoreCase))
+        {
+            return templateCount > 0
+                ? $"Likely stale: row is approved and only {templateCount} template-only frame(s) remain."
+                : "Likely stale: row is approved and no flagged frames are currently recorded.";
+        }
+
+        return relevantReviews.Count == 0
+            ? "No active frame blockers are recorded yet. Recheck visually before queueing AI work."
+            : $"No flagged frames are currently recorded{(string.IsNullOrWhiteSpace(inferredFamily) ? string.Empty : $" in {inferredFamily}")}.";
+    }
+
+    private string? InferRequestFamily(string title, string details, string sourceNote)
+    {
+        var combined = string.Join(" ", [title ?? string.Empty, details ?? string.Empty, sourceNote ?? string.Empty]);
+
+        foreach (var family in _familyOrder)
+        {
+            if (combined.IndexOf(family, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return family;
+            }
+        }
+
+        return null;
+    }
+
+    private void SurfaceAutomationWorkspace(bool logActivity)
+    {
+        SelectedWorkspaceTabIndex = 0;
+        if (logActivity)
+        {
+            AddActivity("automation", "Opened Automation workspace.");
+        }
+    }
+
+    private void SurfaceReviewWorkspace(bool logActivity)
+    {
+        SelectedWorkspaceTabIndex = 1;
+        if (logActivity)
+        {
+            AddActivity("review", "Opened Review workspace.");
+        }
+    }
+
+    private void SurfaceQueueWorkspace(bool logActivity)
+    {
+        SelectedWorkspaceTabIndex = 2;
+        if (logActivity)
+        {
+            AddActivity("review", "Opened Queue workspace.");
+        }
+    }
+
+    private void SurfaceRequestsWorkspace(bool logActivity)
+    {
+        SelectedWorkspaceTabIndex = 3;
+        if (logActivity)
+        {
+            AddActivity("request", "Opened Requests workspace.");
+        }
+    }
+
+    private void SurfaceAnimateWorkspace(bool logActivity)
+    {
+        SelectedWorkspaceTabIndex = 4;
+        SelectedStudioTabIndex = 0;
+        if (logActivity)
+        {
+            AddActivity("viewer", "Opened Animate workspace.");
+        }
+    }
+
+    private void SurfacePaintWorkspace(bool logActivity)
+    {
+        SelectedWorkspaceTabIndex = 4;
+        SelectedStudioTabIndex = 1;
+        if (logActivity)
+        {
+            AddActivity("editor", "Opened Paint workspace.");
+        }
+    }
+
+    private void SurfacePlanningWorkspace(bool logActivity)
+    {
+        SelectedWorkspaceTabIndex = 5;
+        if (logActivity)
+        {
+            AddActivity("planning", "Opened Planning workspace.");
+        }
+    }
 
     private void PrefillRequestDraft(
         string requestType,
@@ -7539,6 +8898,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             ProjectPalettes.Add(new ProjectPaletteItemViewModel(
                 palette.PaletteId,
                 palette.Name,
+                string.IsNullOrWhiteSpace(palette.ScopeKind) ? "project" : palette.ScopeKind,
+                palette.ScopeKey ?? string.Empty,
                 palette.Colors ?? [],
                 palette.UpdatedUtc));
         }
@@ -7569,6 +8930,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             item.ExportId.Equals(SelectedTrustedExportHistoryItem?.ExportId ?? string.Empty, StringComparison.OrdinalIgnoreCase))
             ?? TrustedExportHistoryItems.FirstOrDefault();
         OnPropertyChanged(nameof(TrustedExportHistorySummary));
+        RefreshProjectReadiness();
     }
 
     private void LoadValidationReports()
@@ -7578,6 +8940,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         {
             OnPropertyChanged(nameof(ValidationReportSummary));
             OnPropertyChanged(nameof(SelectedValidationReportSummary));
+            RefreshProjectReadiness();
             return;
         }
 
@@ -7599,6 +8962,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             ?? ValidationReports.FirstOrDefault();
         OnPropertyChanged(nameof(ValidationReportSummary));
         OnPropertyChanged(nameof(SelectedValidationReportSummary));
+        RefreshProjectReadiness();
     }
 
     private List<TrustedExportHistoryRecord> LoadTrustedExportHistoryRecords()
@@ -7692,6 +9056,12 @@ public sealed partial class MainWindowViewModel : ViewModelBase
                 "Candidates are available for compare/apply workflows.",
                 string.Empty),
             new ProjectValidationFinding(
+                "ai_providers",
+                AiProviders.Any(provider => provider.IsDefault) ? "ok" : "warning",
+                AiProviderSummary,
+                "A default provider adapter is configured for visible manual or AI-assisted work.",
+                "No default provider adapter is configured yet."),
+            new ProjectValidationFinding(
                 "frame_review_queue",
                 FrameReviewQueueItems.Count == 0 ? "ok" : "warning",
                 $"{FrameReviewQueueItems.Count} flagged frame review item(s)",
@@ -7708,7 +9078,13 @@ public sealed partial class MainWindowViewModel : ViewModelBase
                 PlanningAdoptionEntries.Count == 0 || PlanningAdoptionEntries.All(entry => entry.StatusLabel.Equals("Complete", StringComparison.OrdinalIgnoreCase)) ? "ok" : "warning",
                 PlanningAdoptionEntrySummary,
                 "Planned sequences align with discovered authored assets.",
-                "Planned sequence adoption still has partial or missing entries.")
+                "Planned sequence adoption still has partial or missing entries."),
+            new ProjectValidationFinding(
+                "project_readiness",
+                ProjectReadinessItems.All(item => item.Status.Equals("ready", StringComparison.OrdinalIgnoreCase)) ? "ok" : "warning",
+                ProjectReadinessSummary,
+                "Readiness checks are clear for release-minded export and portability.",
+                "One or more readiness checks still need attention.")
         };
 
         var warningCount = findings.Count(item => !item.Status.Equals("ok", StringComparison.OrdinalIgnoreCase));
@@ -7834,6 +9210,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     {
         return new ProjectConfig
         {
+            SchemaVersion = source.SchemaVersion,
             ProjectId = source.ProjectId,
             DisplayName = source.DisplayName,
             RootPath = newRootPath,
@@ -7844,6 +9221,16 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             ReviewDataPath = source.ReviewDataPath,
             RequestDataPath = source.RequestDataPath,
             CandidateDataPath = source.CandidateDataPath,
+            DefaultAiProviderId = source.DefaultAiProviderId,
+            AiProviders = source.AiProviders.Select(provider => new AiProviderConfig
+            {
+                ProviderId = provider.ProviderId,
+                DisplayName = provider.DisplayName,
+                ProviderKind = provider.ProviderKind,
+                ExecutionMode = provider.ExecutionMode,
+                SupportsAutomation = provider.SupportsAutomation,
+                Notes = provider.Notes,
+            }).ToArray(),
             VariantAxes = new VariantAxesConfig
             {
                 Species = source.VariantAxes.Species.ToArray(),
@@ -7933,19 +9320,42 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             _projectPaletteStorePath,
             JsonSerializer.Serialize(
                 ProjectPalettes
-                    .Select(item => new ProjectPaletteRecord(item.PaletteId, item.Name, item.Colors.ToList(), item.UpdatedUtc))
+                    .Select(item => new ProjectPaletteRecord(
+                        item.PaletteId,
+                        item.Name,
+                        item.ScopeKind,
+                        item.ScopeKey,
+                        item.Colors.ToList(),
+                        item.UpdatedUtc))
                     .ToList(),
                 new JsonSerializerOptions { WriteIndented = true }));
     }
 
-    private string BuildProjectPaletteName()
+    private string BuildProjectPaletteName(string scopeKind)
     {
+        if (scopeKind.Equals("species", StringComparison.OrdinalIgnoreCase) && SelectedBaseVariant is not null)
+        {
+            return $"{SelectedBaseVariant.Species}-palette";
+        }
+
         if (SelectedBaseVariant is null)
         {
             return $"project-palette-{DateTimeOffset.Now:yyyyMMdd-HHmmss}";
         }
 
         return $"{SelectedBaseVariant.Species}-{SelectedBaseVariant.Age}-{SelectedBaseVariant.Gender}-{SelectedViewerFamily}-palette";
+    }
+
+    private string BuildProjectPaletteScopeKey(string scopeKind)
+    {
+        if (scopeKind.Equals("species", StringComparison.OrdinalIgnoreCase))
+        {
+            return SelectedBaseVariant?.Species ?? string.Empty;
+        }
+
+        return !string.IsNullOrWhiteSpace(_projectConfigPath)
+            ? Path.GetFileNameWithoutExtension(_projectConfigPath)
+            : "project";
     }
 
     private List<string> ExtractPaletteFromCurrentContext()
@@ -8337,6 +9747,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedAutomationTaskCandidates));
         OnPropertyChanged(nameof(SelectedAutomationTaskLinkedCandidatesSummary));
         OnPropertyChanged(nameof(AutomationQueueHint));
+        NotifyCurrentTaskChanged();
     }
 
     private bool UpdateRequestStatus(string requestId, string newStatus)
@@ -8559,6 +9970,18 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(BlinkCompareSummary));
     }
 
+    private void OnEditorBlinkTimerTick(object? sender, EventArgs e)
+    {
+        if (!IsEditorBlinkCompareEnabled || !HasEditorBaselineBitmap || !IsEditorFrameLoaded)
+        {
+            return;
+        }
+
+        _showEditorBaselineBlinkFrame = !_showEditorBaselineBlinkFrame;
+        OnPropertyChanged(nameof(EditorBlinkCompareBitmap));
+        OnPropertyChanged(nameof(EditorBlinkCompareSummary));
+    }
+
     private void ApplyFilters()
     {
         var filtered = _allBaseVariants
@@ -8623,6 +10046,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(RepairQueueSummary));
         OnPropertyChanged(nameof(NeedsReviewSummary));
+        NotifyCurrentTaskChanged();
     }
 
     private void RefreshFrameReviewQueue()
@@ -8680,6 +10104,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(FrameReviewQueueSummary));
         RefreshVariantFrameQuality();
         RefreshTrustedExportBlockers();
+        NotifyCurrentTaskChanged();
     }
 
     private void RefreshVariantFrameQuality()
@@ -9556,6 +10981,8 @@ internal sealed record PlanningTemplateRecord(
 internal sealed record ProjectPaletteRecord(
     string PaletteId,
     string Name,
+    string? ScopeKind,
+    string? ScopeKey,
     List<string> Colors,
     DateTimeOffset? UpdatedUtc);
 

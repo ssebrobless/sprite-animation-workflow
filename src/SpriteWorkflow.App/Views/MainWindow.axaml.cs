@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -9,10 +10,31 @@ namespace SpriteWorkflow.App.Views;
 public partial class MainWindow : Window
 {
     private bool _isEditorPainting;
+    private MainWindowViewModel? _observedViewModel;
 
     public MainWindow()
     {
         InitializeComponent();
+        DataContextChanged += OnMainWindowDataContextChanged;
+    }
+
+    private void OnMainWindowDataContextChanged(object? sender, EventArgs e)
+    {
+        if (_observedViewModel is not null)
+        {
+            _observedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        }
+
+        _observedViewModel = DataContext as MainWindowViewModel;
+        if (_observedViewModel is not null)
+        {
+            _observedViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // The main shell is now fixed-height and workspace-first, so there is no global scroll surface to reset.
     }
 
     private void OnEditorPixelPointerPressed(object? sender, PointerPressedEventArgs e)

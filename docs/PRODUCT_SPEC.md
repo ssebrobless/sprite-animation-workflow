@@ -129,3 +129,4 @@ Primary execution sources:
 
 - [PERFECT_LOOP_EXECUTION_PLAN.md](C:/Users/fishe/Documents/projects/sprite-workflow-app/docs/PERFECT_LOOP_EXECUTION_PLAN.md)
 - [PERFECT_LOOP_MILESTONE_BACKLOG.md](C:/Users/fishe/Documents/projects/sprite-workflow-app/docs/PERFECT_LOOP_MILESTONE_BACKLOG.md)
+- [NEXT_WAVE_PLAN.md](C:/Users/fishe/Documents/projects/sprite-workflow-app/docs/NEXT_WAVE_PLAN.md)

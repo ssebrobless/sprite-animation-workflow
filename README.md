@@ -30,13 +30,15 @@ Current app capabilities:
 
 - load a project profile and discover existing authored/runtime assets
 - plan a blank project from scratch or adopt an existing sprite tree
+- keep provider-agnostic AI adapters visible in-app instead of hard-coding one AI service into the domain model
 - browse rows by species, age, gender, family, coverage, and review state
 - review animations with frozen edit frames, live playback, onion skin, and compare tools
-- paint directly in-app with layers, palettes, selection tools, lasso, shapes, transforms, history, and reference layers
+- paint directly in-app with layers, palettes, selection tools, lasso, shapes, transforms, blink compare, history, and reference layers
 - save frame-level notes, statuses, issue tags, and approval state
 - stage authored, runtime, and editor-canvas candidates before import
 - build AI requests and keep visible AI task/activity history
 - export trusted sets, validation reports, project kits, and blank validation sandboxes
+- surface project readiness, discovery categories, trusted export blockers, and portability state in-app
 
 ## Start Here
 
@@ -44,11 +46,15 @@ Primary roadmap:
 
 - [PERFECT_LOOP_EXECUTION_PLAN.md](C:/Users/fishe/Documents/projects/sprite-workflow-app/docs/PERFECT_LOOP_EXECUTION_PLAN.md)
 - [PERFECT_LOOP_MILESTONE_BACKLOG.md](C:/Users/fishe/Documents/projects/sprite-workflow-app/docs/PERFECT_LOOP_MILESTONE_BACKLOG.md)
+- [NEXT_WAVE_PLAN.md](C:/Users/fishe/Documents/projects/sprite-workflow-app/docs/NEXT_WAVE_PLAN.md)
 - [PRODUCT_SPEC.md](C:/Users/fishe/Documents/projects/sprite-workflow-app/docs/PRODUCT_SPEC.md)
+- [RELEASE_CHECKLIST.md](C:/Users/fishe/Documents/projects/sprite-workflow-app/docs/RELEASE_CHECKLIST.md)
 
-First sample profile:
+Sample profiles:
 
 - [wevito.project.json](C:/Users/fishe/Documents/projects/sprite-workflow-app/sample-projects/wevito.project.json)
+- [blank-starter.project.json](C:/Users/fishe/Documents/projects/sprite-workflow-app/sample-projects/blank-starter.project.json)
+- [imported-external.project.json](C:/Users/fishe/Documents/projects/sprite-workflow-app/sample-projects/imported-external.project.json)
 
 ## Run
 

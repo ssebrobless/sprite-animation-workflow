@@ -4,6 +4,9 @@ namespace SpriteWorkflow.ProjectModel;
 
 public sealed class ProjectConfig
 {
+    [JsonPropertyName("schema_version")]
+    public int SchemaVersion { get; set; } = 1;
+
     [JsonPropertyName("project_id")]
     public string ProjectId { get; set; } = string.Empty;
 
@@ -33,6 +36,12 @@ public sealed class ProjectConfig
 
     [JsonPropertyName("candidate_data_path")]
     public string CandidateDataPath { get; set; } = string.Empty;
+
+    [JsonPropertyName("default_ai_provider_id")]
+    public string DefaultAiProviderId { get; set; } = string.Empty;
+
+    [JsonPropertyName("ai_providers")]
+    public AiProviderConfig[] AiProviders { get; set; } = [];
 
     [JsonPropertyName("variant_axes")]
     public VariantAxesConfig VariantAxes { get; set; } = new();
@@ -91,4 +100,25 @@ public sealed class WorkflowActionConfig
 
     [JsonPropertyName("working_directory")]
     public string WorkingDirectory { get; set; } = string.Empty;
+}
+
+public sealed class AiProviderConfig
+{
+    [JsonPropertyName("provider_id")]
+    public string ProviderId { get; set; } = string.Empty;
+
+    [JsonPropertyName("display_name")]
+    public string DisplayName { get; set; } = string.Empty;
+
+    [JsonPropertyName("provider_kind")]
+    public string ProviderKind { get; set; } = string.Empty;
+
+    [JsonPropertyName("execution_mode")]
+    public string ExecutionMode { get; set; } = "manual_browser";
+
+    [JsonPropertyName("supports_automation")]
+    public bool SupportsAutomation { get; set; }
+
+    [JsonPropertyName("notes")]
+    public string Notes { get; set; } = string.Empty;
 }

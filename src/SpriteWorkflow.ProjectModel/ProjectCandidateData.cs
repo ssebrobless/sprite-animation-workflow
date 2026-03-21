@@ -4,6 +4,9 @@ namespace SpriteWorkflow.ProjectModel;
 
 public sealed class ProjectCandidateData
 {
+    [JsonPropertyName("schema_version")]
+    public int SchemaVersion { get; set; } = 1;
+
     [JsonPropertyName("candidates")]
     public List<ProjectCandidateRecord> Candidates { get; set; } = [];
 }

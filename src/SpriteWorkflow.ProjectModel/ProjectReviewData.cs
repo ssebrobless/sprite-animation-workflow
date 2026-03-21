@@ -4,6 +4,9 @@ namespace SpriteWorkflow.ProjectModel;
 
 public sealed class ProjectReviewData
 {
+    [JsonPropertyName("schema_version")]
+    public int SchemaVersion { get; set; } = 1;
+
     [JsonPropertyName("base_variant_reviews")]
     public List<BaseVariantReviewRecord> BaseVariantReviews { get; set; } = [];
 

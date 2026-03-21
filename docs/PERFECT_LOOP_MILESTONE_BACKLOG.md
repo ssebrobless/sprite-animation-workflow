@@ -19,6 +19,18 @@ This backlog translates the execution roadmap into concrete implementation work.
 Primary roadmap:
 
 - `PERFECT_LOOP_EXECUTION_PLAN.md`
+- `RELEASE_CHECKLIST.md`
+
+## Current Release-Wave Focus
+
+```text
+Release Hardening      -> package, validate, export, prove portability
+Manual Art Deepening   -> stronger Paint/Studio workflow for solo creators
+AI Loop Deepening      -> provider adapters, visible attempts, safer candidates
+Cross-Project Validation -> blank projects + imported projects + readiness
+```
+
+This wave keeps the existing workspace structure and makes it release-ready for a new solo creator without breaking existing Wevito project data.
 
 ## Working Rules
 
